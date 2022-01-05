@@ -1,0 +1,13 @@
+name: Merge sync to main
+
+on:
+  push:
+    branches:
+      - sync
+
+jobs:
+  do_merge:
+    runs-on: ubuntu-20.04
+    steps:
+      - name: echo
+        run: echo action is "${{ github.event.action }}" and event_name is "${{ github.event_name }}"
