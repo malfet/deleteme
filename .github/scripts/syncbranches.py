@@ -1,10 +1,11 @@
 #!/usr/bin/env python3
 
-from typing import cast, Dict, List, Tuple, Union
+from typing import cast, Any, Dict, List, Tuple, Union
+from collections import defaultdict
 import os
 
 
-def _check_output(items: List[str], encoding='utf-8') -> str:
+def _check_output(items: List[str], encoding:str = "utf-8") -> str:
     from subprocess import check_output
     return check_output(items).decode(encoding)
 
@@ -13,24 +14,22 @@ def fuzzy_list_to_dict(items: List[Tuple[str, str]]) -> Dict[str, List[str]]:
     """
     Converts list to dict preserving elements with duplicate keys
     """
-    rc: Dict[str, List[str]] = {}
+    rc: Dict[str, List[str]] = defaultdict(lambda:[])
     for (key, val) in items:
-        if key not in rc:
-            rc[key] = []
         rc[key].append(val)
-    return rc
+    return dict(rc)
 
 
 class GitRepo:
-    def __init__(self, path, remote='origin'):
+    def __init__(self, path: str, remote:str = "origin") -> None:
         self.repo_dir = path
         self.remote = remote
 
-    def _run_git(self, *args) -> str:
+    def _run_git(self, *args: Any) -> str:
         return _check_output(["git", "-C", self.repo_dir] + list(args))
 
-    def revlist(self, revision_range) -> List[str]:
-        rc = self._run_git('rev-list', revision_range, '--', '.').strip()
+    def revlist(self, revision_range: str) -> List[str]:
+        rc = self._run_git("rev-list", revision_range, "--", ".").strip()
         return rc.split("\n") if len(rc) > 0 else []
 
     def current_branch(self) -> str:
@@ -39,7 +38,7 @@ class GitRepo:
     def checkout(self, branch: str) -> None:
         self._run_git('checkout', branch)
 
-    def show_ref(self, name) -> str:
+    def show_ref(self, name: str) -> str:
         refs = self._run_git('show-ref', '-s', name).strip().split('\n')
         if not all(refs[i] == refs[0] for i in range(1, len(refs))):
             raise RuntimeError(f"referce {name} is ambigous")
@@ -104,8 +103,8 @@ class GitRepo:
 
 if __name__ == '__main__':
     repo_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..'))
-    main_branch = 'main'
+    default_branch = 'main'
     sync_branch = 'sync'
     repo = GitRepo(repo_dir)
-    repo.cherry_pick_commits(sync_branch, main_branch)
-    repo.push(main_branch)
+    repo.cherry_pick_commits(sync_branch, default_branch)
+    repo.push(default_branch)
