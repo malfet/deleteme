@@ -16,6 +16,8 @@ jobs:
           architecture: x64
       - name: Checkout repo
         uses: actions/checkout@v2
+        with:
+          fetch-depth: 0
       - name: Sync branches
         run: |
           python3 .github/scripts/syncbranches.py
