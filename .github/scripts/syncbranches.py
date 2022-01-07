@@ -1,11 +1,12 @@
 #!/usr/bin/env python3
 
-from typing import cast, Any, Dict, List, Tuple, Union
 from collections import defaultdict
+from datetime import datetime
+from typing import cast, Any, Dict, List, Optional, Tuple, Union
 import os
 
 
-def _check_output(items: List[str], encoding:str = "utf-8") -> str:
+def _check_output(items: List[str], encoding: str = "utf-8") -> str:
     from subprocess import check_output
     return check_output(items).decode(encoding)
 
@@ -14,14 +15,78 @@ def fuzzy_list_to_dict(items: List[Tuple[str, str]]) -> Dict[str, List[str]]:
     """
     Converts list to dict preserving elements with duplicate keys
     """
-    rc: Dict[str, List[str]] = defaultdict(lambda:[])
+    rc: Dict[str, List[str]] = defaultdict(lambda: [])
     for (key, val) in items:
         rc[key].append(val)
     return dict(rc)
 
 
+class GitCommit:
+    commit_hash: str
+    title: str
+    body: str
+    author: str
+    author_date: datetime
+    commit_date: Optional[datetime]
+
+    def __init__(self,
+                 commit_hash: str,
+                 author: str,
+                 author_date: datetime,
+                 title: str,
+                 body: str,
+                 commit_date: Optional[datetime] = None) -> None:
+        self.commit_hash = commit_hash
+        self.author = author
+        self.author_date = author_date
+        self.commit_date = commit_date
+        self.title = title
+        self.body = body
+
+    def __repr__(self) -> str:
+        return f"{self.title} ({self.commit_hash})"
+
+    def __contains__(self, item: Any) -> bool:
+        return item in self.body or item in self.title
+
+
+def parse_fuller_format(lines: Union[str, List[str]]) -> GitCommit:
+    """
+    Expect commit message generated using `--format=fuller --date=unix` format, i.e.:
+        commit <sha1>
+        Author:     <author>
+        AuthorDate: <author date>
+        Commit:     <committer>
+        CommitDate: <committer date>
+
+        <title line>
+
+        <full commit message>
+
+    """
+    if isinstance(lines, str):
+        lines = lines.split("\n")
+    # TODO: Handle merge commits correctly
+    if len(lines) > 1 and lines[1].startswith("Merge:"):
+        del lines[1]
+    assert len(lines) > 7
+    assert lines[0].startswith("commit")
+    assert lines[1].startswith("Author: ")
+    assert lines[2].startswith("AuthorDate: ")
+    assert lines[3].startswith("Commit: ")
+    assert lines[4].startswith("CommitDate: ")
+    assert len(lines[5]) == 0
+    return GitCommit(commit_hash=lines[0].split()[1].strip(),
+                     author=lines[1].split(":", 1)[1].strip(),
+                     author_date=datetime.fromtimestamp(int(lines[2].split(":", 1)[1].strip())),
+                     commit_date=datetime.fromtimestamp(int(lines[4].split(":", 1)[1].strip())),
+                     title=lines[6].strip(),
+                     body="\n".join(lines[7:]),
+                     )
+
+
 class GitRepo:
-    def __init__(self, path: str, remote:str = "origin") -> None:
+    def __init__(self, path: str, remote: str = "origin") -> None:
         self.repo_dir = path
         self.remote = remote
 
@@ -59,6 +124,9 @@ class GitRepo:
         rc = _check_output(['sh', '-c', f'git -C {self.repo_dir} show {ref}|git patch-id --stable']).strip()
         return [cast(Tuple[str, str], x.split(" ", 1)) for x in rc.split("\n")]
 
+    def get_commit(self, ref: str) -> GitCommit:
+        return parse_fuller_format(self._run_git('show', '--format=fuller', '--date=unix', '--shortstat', ref))
+
     def cherry_pick(self, ref: str) -> None:
         self._run_git('cherry-pick', '-x', ref)
 
@@ -75,13 +143,21 @@ class GitRepo:
         from_ids = fuzzy_list_to_dict(self.patch_id(from_commits))
         to_ids = fuzzy_list_to_dict(self.patch_id(to_commits))
         for patch_id in set(from_ids).intersection(set(to_ids)):
-            if len(from_ids[patch_id]) != len(to_ids[patch_id]):
-                # TODO: This is likely an indication of apply-revert-apply sequence on one branch
-                # but just apply on another, need to investigate further
-                raise RuntimeError("Number of commits with identical patch_ids do not match")
-            for commit in from_ids[patch_id]:
+            from_values = from_ids[patch_id]
+            to_values = to_ids[patch_id]
+            if len(from_values) != len(to_values):
+                # Eliminate duplicate commits+reverts from the list
+                while len(from_values) > 0 and len(to_values) > 0:
+                    frc = self.get_commit(from_values.pop())
+                    toc = self.get_commit(to_values.pop())
+                    if frc.title != toc.title or frc.author_date != toc.author_date:
+                        raise RuntimeError(f"Unexpected differences between {frc} and {toc}")
+                    from_commits.remove(frc.commit_hash)
+                    to_commits.remove(toc.commit_hash)
+                continue
+            for commit in from_values:
                 from_commits.remove(commit)
-            for commit in to_ids[patch_id]:
+            for commit in to_values:
                 to_commits.remove(commit)
         return (from_commits, to_commits)
 
