@@ -18,6 +18,11 @@ jobs:
         uses: actions/checkout@v2
         with:
           fetch-depth: 0
+
+      - name: Setup commiter id
+        run: |
+          git config --global user.email "nekto@pisem.net"
+          git config --global user.name "Nekto Scromny"
       - name: Sync branches
         run: |
           python3 .github/scripts/syncbranches.py
