@@ -1,8 +1,7 @@
 #!/usr/bin/env python3
 
-from typing import Any, Callable, Dict, List, Tuple, Optional, Union
+from typing import cast, Dict, List, Tuple, Union
 import os
-import sys
 
 
 def _check_output(items: List[str], encoding='utf-8') -> str:
@@ -14,10 +13,10 @@ def fuzzy_list_to_dict(items: List[Tuple[str, str]]) -> Dict[str, List[str]]:
     """
     Converts list to dict preserving elements with duplicate keys
     """
-    rc = {}
+    rc: Dict[str, List[str]] = {}
     for (key, val) in items:
         if key not in rc:
-            rc[key]=list()
+            rc[key] = []
         rc[key].append(val)
     return rc
 
@@ -27,7 +26,7 @@ class GitRepo:
         self.repo_dir = path
         self.remote = remote
 
-    def _run_git(self, *args: Tuple[str, ...]) -> str:
+    def _run_git(self, *args) -> str:
         return _check_output(["git", "-C", self.repo_dir] + list(args))
 
     def revlist(self, revision_range) -> List[str]:
@@ -37,34 +36,34 @@ class GitRepo:
     def current_branch(self) -> str:
         return self._run_git("symbolic-ref", "--short", "HEAD").strip()
 
-    def checkout(self, branch:str) -> None:
+    def checkout(self, branch: str) -> None:
         self._run_git('checkout', branch)
 
     def show_ref(self, name) -> str:
         refs = self._run_git('show-ref', '-s', name).strip().split('\n')
-        if not all(refs[i]==refs[0] for i in range(1, len(refs))):
+        if not all(refs[i] == refs[0] for i in range(1, len(refs))):
             raise RuntimeError(f"referce {name} is ambigous")
         return refs[0]
 
-    def rev_parse(self, name:str) -> str:
+    def rev_parse(self, name: str) -> str:
         return self._run_git('rev-parse', '--verify', name).strip()
 
-    def get_merge_base(self, from_ref:str, to_ref:str) -> str:
+    def get_merge_base(self, from_ref: str, to_ref: str) -> str:
         return self._run_git('merge-base', from_ref, to_ref).strip()
 
-    def patch_id(self, ref:Union[str, List[str]]) -> List[Tuple[str, str]]:
+    def patch_id(self, ref: Union[str, List[str]]) -> List[Tuple[str, str]]:
         is_list = isinstance(ref, list)
         if is_list:
             if len(ref) == 0:
                 return []
             ref = " ".join(ref)
         rc = _check_output(['sh', '-c', f'git -C {self.repo_dir} show {ref}|git patch-id --stable']).strip()
-        return [x.split(" ") for x in rc.split("\n")]
+        return [cast(Tuple[str, str], x.split(" ", 1)) for x in rc.split("\n")]
 
-    def cherry_pick(self, ref:str) -> None:
+    def cherry_pick(self, ref: str) -> None:
         self._run_git('cherry-pick', '-x', ref)
 
-    def compute_branch_diffs(self, from_branch:str, to_branch:str) -> Tuple[List[str], List[str]]:
+    def compute_branch_diffs(self, from_branch: str, to_branch: str) -> Tuple[List[str], List[str]]:
         """
         Returns list of commmits that are missing in each other branch since their merge base
         Might be slow if merge base is between two branches is pretty far off
@@ -87,7 +86,7 @@ class GitRepo:
                 to_commits.remove(commit)
         return (from_commits, to_commits)
 
-    def cherry_pick_commits(self, from_branch:str, to_branch:str) -> None:
+    def cherry_pick_commits(self, from_branch: str, to_branch: str) -> None:
         orig_branch = self.current_branch()
         self.checkout(to_branch)
         from_commits, to_commits = self.compute_branch_diffs(from_branch, to_branch)
