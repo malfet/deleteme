@@ -88,12 +88,13 @@ class GitRepo:
         return (from_commits, to_commits)
 
     def cherry_pick_commits(self, from_branch:str, to_branch:str) -> None:
-        from_commits, to_commits = self.compute_branch_diffs(from_branch, to_branch)
         orig_branch = self.current_branch()
+        self.checkout(to_branch)
+        from_commits, to_commits = self.compute_branch_diffs(from_branch, to_branch)
         if len(from_commits) == 0:
             print("Nothing to do")
+            self.checkout(orig_branch)
             return
-        self.checkout(to_branch)
         for commit in reversed(from_commits):
             self.cherry_pick(commit)
         self.checkout(orig_branch)
@@ -105,7 +106,7 @@ class GitRepo:
 if __name__ == '__main__':
     repo_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..'))
     main_branch = 'main'
-    sync_branch = 'origin/sync'
+    sync_branch = 'sync'
     repo = GitRepo(repo_dir)
     repo.cherry_pick_commits(sync_branch, main_branch)
     repo.push(main_branch)
