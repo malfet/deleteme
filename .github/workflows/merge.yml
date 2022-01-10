@@ -3,8 +3,9 @@ name: Validate and merge PR
 on:
   workflow_dispatch:
     inputs:
-      name: 'pr_num'
-      required: true
+      pr_num:
+        description: "pr number"
+        required: true
 
 jobs:
   do_merge:
