@@ -1,0 +1,31 @@
+name: Validate and merge PR
+
+on:
+  workflow_dispatch:
+    inputs:
+      name: 'pr_num'
+      required: true
+
+jobs:
+  do_merge:
+    runs-on: ubuntu-20.04
+    steps:
+      - name: Setup Python
+        uses: actions/setup-python@v2
+        with:
+          python-version: 3.8
+          architecture: x64
+      - name: Checkout repo
+        uses: actions/checkout@v2
+        with:
+          fetch-depth: 0
+
+      - name: Setup committer id
+        run: |
+          git config --global user.email "nekto@pisem.net"
+          git config --global user.name "Nekto Scromny"
+      - name: Sync branches
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          python3 .github/scripts/trymerge.py ${{ github.repository }} ${{ github.event.inputs.name }}
