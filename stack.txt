@@ -1,1 +1,2 @@
-Add stack.txt
+New message here
+Original one is gone
