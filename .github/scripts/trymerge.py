@@ -6,6 +6,38 @@ from urllib.error import HTTPError
 from typing import Any, Callable, Dict, List, Optional
 
 
+GH_GET_PR_INFO_QUERY="""
+query ($owner: String!, $name: String!, $number: Int!) {
+  repository(owner: $owner, name: $name) {
+    pullRequest(number: $number) {
+      state,
+      title,
+      body,
+      headRefName
+      headRepository {
+        nameWithOwner
+      }
+      baseRefName
+      changedFiles,
+      files(last: 100) {
+        nodes {
+          path,
+        }
+      }
+      reviews(last: 100) {
+        nodes {
+          author {
+            login
+          },
+          state
+        },
+        totalCount
+      }
+    }
+  }
+}
+"""
+
 def _fetch_url(url: str, *,
                headers: Optional[Dict[str, str]] = None,
                data: Optional[Dict[str, Any]] = None,
@@ -63,14 +95,36 @@ def gh_update_pr(org: str, project: str, pr_num: int, *,
                       method="PATCH",
                       reader=json.load)
 
+
+
+def gh_graphql(query: str, **kwargs: Any) -> List[Dict[str, Any]]:
+    return _fetch_url("https://api.github.com/graphql", data={"query":query, "variables": kwargs}, reader=json.load)
+
+
+def gh_get_pr_info(org: str, proj: str, pr_no: int) -> Any:
+    rc = gh_graphql(GH_GET_PR_INFO_QUERY, name=proj, owner=org, number=pr_no)
+    return rc["data"]["repository"]["pullRequest"]
+
+def gh_fetch_pr_diff(org: str , proj: str, pr_no: int) -> str:
+    headers = {'Accept': 'application/vnd.github.v3.diff'}
+    return _fetch_url(f'https://api.github.com/repos/{org}/{proj}/pulls/{pr_no}', headers).decode("utf-8")
+
 def main() -> None:
     import sys
     if len(sys.argv) != 3:
         print("Unexpected number of arguments")
         sys.exit(-1)
+
     org, project = sys.argv[1].split('/', 1)
     pr_num = int(sys.argv[2])
-    print(gh_post_comment(org, project, pr_num, f"argv={sys.argv}"))
+
+    info = gh_get_pr_info(org, project, pr_num)
+    if int(info["changedFiles"])>100:
+        gh_post_comment(org, project, pr_num, "Can't merge: too many files changed")
+        sys.exit(-1)
+
+    files_changed = [x["path"] for x in info["files"]["nodes"]]
+    print(gh_post_comment(org, project, pr_num, f"argv={sys.argv}\nfiles_changed={files_changed}"))
 
 
 if __name__ == "__main__":
