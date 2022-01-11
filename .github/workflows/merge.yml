@@ -1,11 +1,8 @@
 name: Validate and merge PR
 
 on:
-  workflow_dispatch:
-    inputs:
-      pr_num:
-        description: "pr number"
-        required: true
+  repository_dispatch:
+    types: [try-merge]
 
 jobs:
   do_merge:
@@ -29,4 +26,4 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          python3 .github/scripts/trymerge.py ${{ github.repository }} ${{ github.event.inputs.pr_num }}
+          python3 .github/scripts/trymerge.py ${{ github.repository }} ${{ github.event.client_payload.pr_num }}
