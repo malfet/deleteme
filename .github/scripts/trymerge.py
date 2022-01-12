@@ -328,7 +328,7 @@ class GitHubPR:
             self.merge_ghstack_into(repo)
 
         if not dry_run:
-            repo.push(default_branch)
+            repo.push(self.default_branch())
 
 
 def check_if_should_be_merged(pr: GitHubPR, repo: GitRepo) -> None:
