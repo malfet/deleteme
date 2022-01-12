@@ -24,6 +24,12 @@ query ($owner: String!, $name: String!, $number: Int!) {
         nameWithOwner
       }
       baseRefName
+      baseRepository {
+        nameWithOwner
+        defaultBranchRef {
+          name
+        }
+      }
       commits(first: 100) {
         nodes {
           commit {
@@ -61,6 +67,13 @@ query ($owner: String!, $name: String!, $number: Int!) {
 
 RE_GITHUB_URL_MATCH = re.compile("^https://.*@?github.com/(.+)/(.+)$")
 RE_GHSTACK_HEAD_REF = re.compile(r"^(gh/[^/]+/[0-9]+/)head$")
+RE_GHSTACK_SOURCE_ID = re.compile(r'^ghstack-source-id: (.+)\n?', re.MULTILINE)
+RE_PULL_REQUEST_RESOLVED = re.compile(
+    r'Pull Request resolved: '
+    r'https://github.com/(?P<owner>[^/]+)/(?P<repo>[^/]+)/pull/(?P<number>[0-9]+)',
+    re.MULTILINE
+)
+
 
 
 def _check_output(items: List[str], encoding: str = "utf-8") -> str:
@@ -92,6 +105,15 @@ class GitRepo:
     def current_branch(self) -> str:
         return self._run_git("symbolic-ref", "--short", "HEAD").strip()
 
+    def checkout(self, branch: str) -> None:
+        self._run_git('checkout', branch)
+
+    def push(self, branch: str) -> None:
+        self._run_git("push", self.remote, branch)
+
+    def head_hash(self) -> str:
+        return self._run_git("show-ref", "--hash", "HEAD").strip()
+
     def remote_url(self) -> str:
         return self._run_git("remote", "get-url", self.remote)
 
@@ -103,6 +125,15 @@ class GitRepo:
         if rc is None:
             raise RuntimeError(f"Unexpected url format {url}")
         return cast(Tuple[str, str], rc.groups())
+
+    def cherry_pick(self, ref: str) -> None:
+        self._run_git('cherry-pick', ref)
+
+    def commit_message(self, ref:str) -> str:
+        return self._run_git("log", "-1", "--format=%B", ref)
+
+    def amend_commit_message(self, msg: str) -> None:
+        self._run_git("commit", "--amend", "-m", msg)
 
 
 def _fetch_url(url: str, *,
@@ -188,6 +219,7 @@ def parse_args() -> Any:
 
 class GitHubPR:
     def __init__(self, org: str, project: str, pr_num: int) -> None:
+        assert isinstance(pr_num, int)
         self.org = org
         self.project = project
         self.pr_num = pr_num
@@ -199,14 +231,17 @@ class GitHubPR:
     def is_cross_repo(self) -> bool:
         return bool(self.info["isCrossRepository"])
 
-    def get_base_ref(self) -> str:
+    def base_ref(self) -> str:
         return self.info["baseRefName"]
 
-    def get_head_ref(self) -> str:
+    def default_branch(self) -> str:
+        return self.info["baseRepository"]["defaultBranchRef"]["name"]
+
+    def head_ref(self) -> str:
         return self.info["headRefName"]
 
     def is_ghstack_pr(self) -> bool:
-        return RE_GHSTACK_HEAD_REF.match(self.get_head_ref()) is not None
+        return RE_GHSTACK_HEAD_REF.match(self.head_ref()) is not None
 
     def get_changed_files_count(self) -> int:
         return int(self.info["changedFiles"])
@@ -261,13 +296,45 @@ class GitHubPR:
     def get_pr_url(self) -> str:
         return f"https://github.com/{self.org}/{self.project}/pull/{self.pr_num}"
 
-    def merge_pr(self, repo: GitRepo, dry_run: bool = False) -> None:
-        current_branch = repo.current_branch()
-        if not self.is_ghstack_pr():
-            repo._run_git("merge", "--squash", f"{repo.remote}/{self.get_head_ref}")
-            repo._run_git("commit", f"--author=\"{self.get_author()}\"", "-m", self.get_body())
+    def merge_ghstack_into(self, repo: GitRepo) -> None:
+        assert self.is_ghstack_pr()
         # For ghstack, cherry-pick commits based from origin
-        orig_ref = f"{repo.remote}/{self.get_head_ref().rsplit('/', 1)[0]}/orig"
+        orig_ref = f"{repo.remote}/{re.sub(r'/head$', '/orig', self.head_ref())}"
+        rev_list = repo.revlist(f"{self.default_branch()}..{orig_ref}")
+        for idx, rev in enumerate(reversed(rev_list)):
+            msg = repo.commit_message(rev)
+            m = RE_PULL_REQUEST_RESOLVED.search(msg)
+            assert self.org == m.group('owner') and self.project == m.group('repo')
+            pr_num = int(m.group('number'))
+            if pr_num != self.pr_num:
+                pr = GitHubPR(self.org, self.project, pr_num)
+                if pr.is_closed():
+                    print(f"Skipping {idx+1} of {len(rev_list)} PR (#{pr_num}) as its already been merged")
+                    continue
+                check_if_should_be_merged(pr, repo)
+            repo.cherry_pick(rev)
+            repo.amend_commit_message(re.sub(RE_GHSTACK_SOURCE_ID, "", msg))
+
+    def merge_into(self, repo: GitRepo, dry_run: bool = False) -> None:
+        check_if_should_be_merged(self, repo)
+        if repo.current_branch() != self.default_branch():
+            repo.checkout(self.default_branch())
+        if not self.is_ghstack_pr():
+            msg = self.get_body()
+            msg += f"\nPull Request resolved: {self.get_pr_url()}\n"
+            repo._run_git("merge", "--squash", f"{repo.remote}/{self.head_ref()}")
+            repo._run_git("commit", f"--author=\"{self.get_author()}\"", "-m", msg)
+        else:
+            self.merge_ghstack_into(repo)
+
+        if not dry_run:
+            repo.push(default_branch)
+
+
+def check_if_should_be_merged(pr: GitHubPR, repo: GitRepo) -> None:
+    changed_files = pr.get_changed_files()
+    approved_by = pr.get_approved_by()
+    author = pr.get_author()
 
 
 def main() -> None:
@@ -275,7 +342,6 @@ def main() -> None:
     args = parse_args()
     repo = GitRepo(get_git_repo_dir(), get_git_remote_name())
     org, project = repo.gh_owner_and_name()
-    current_branch = repo.current_branch()
 
     pr = GitHubPR(org, project, args.pr_num)
     if pr.is_closed():
@@ -286,10 +352,10 @@ def main() -> None:
         print(gh_post_comment(org, project, args.pr_num, "Cross-repo merges are not supported at the moment", dry_run=args.dry_run))
         sys.exit(-1)
 
-    changed_files = pr.get_changed_files()
-    approved_by = pr.get_approved_by()
-    author = pr.get_author()
-    print(gh_post_comment(org, project, args.pr_num, f"args={args}\nfiles_changed={changed_files}\nreviewers={approved_by}\nauthor={author}", dry_run=args.dry_run))
+    try:
+        pr.merge_into(repo, dry_run=args.dry_run)
+    except Exception as e:
+        gh_post_comment(org, project, args.pr_num, f"Merge failed due to {e}", dry_run=args.dry_run)
 
 
 if __name__ == "__main__":
