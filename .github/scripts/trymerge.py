@@ -6,7 +6,7 @@ import re
 from urllib.request import urlopen, Request
 from urllib.error import HTTPError
 from typing import cast, Any, Callable, Dict, List, Optional, Tuple
-from gitutils import get_git_remote_name, get_git_repo_dir
+from gitutils import get_git_remote_name, get_git_repo_dir, GitRepo
 
 
 GH_GET_PR_INFO_QUERY = """
@@ -66,7 +66,6 @@ query ($owner: String!, $name: String!, $number: Int!) {
 }
 """
 
-RE_GITHUB_URL_MATCH = re.compile("^https://.*@?github.com/(.+)/(.+)$")
 RE_GHSTACK_HEAD_REF = re.compile(r"^(gh/[^/]+/[0-9]+/)head$")
 RE_GHSTACK_SOURCE_ID = re.compile(r'^ghstack-source-id: (.+)\n?', re.MULTILINE)
 RE_PULL_REQUEST_RESOLVED = re.compile(
@@ -74,58 +73,6 @@ RE_PULL_REQUEST_RESOLVED = re.compile(
     r'https://github.com/(?P<owner>[^/]+)/(?P<repo>[^/]+)/pull/(?P<number>[0-9]+)',
     re.MULTILINE
 )
-
-
-
-def _check_output(items: List[str], encoding: str = "utf-8") -> str:
-    from subprocess import check_output
-    return check_output(items).decode(encoding)
-
-
-class GitRepo:
-    def __init__(self, path: str, remote: str = "origin") -> None:
-        self.repo_dir = path
-        self.remote = remote
-
-    def _run_git(self, *args: Any) -> str:
-        return _check_output(["git", "-C", self.repo_dir] + list(args))
-
-    def revlist(self, revision_range: str) -> List[str]:
-        rc = self._run_git("rev-list", revision_range, "--", ".").strip()
-        return rc.split("\n") if len(rc) > 0 else []
-
-    def current_branch(self) -> str:
-        return self._run_git("symbolic-ref", "--short", "HEAD").strip()
-
-    def checkout(self, branch: str) -> None:
-        self._run_git('checkout', branch)
-
-    def push(self, branch: str) -> None:
-        self._run_git("push", self.remote, branch)
-
-    def head_hash(self) -> str:
-        return self._run_git("show-ref", "--hash", "HEAD").strip()
-
-    def remote_url(self) -> str:
-        return self._run_git("remote", "get-url", self.remote)
-
-    def gh_owner_and_name(self) -> Tuple[str, str]:
-        url = os.getenv("GIT_REMOTE_URL", None)
-        if url is None:
-            url = self.remote_url()
-        rc = RE_GITHUB_URL_MATCH.match(url)
-        if rc is None:
-            raise RuntimeError(f"Unexpected url format {url}")
-        return cast(Tuple[str, str], rc.groups())
-
-    def cherry_pick(self, ref: str) -> None:
-        self._run_git('cherry-pick', ref)
-
-    def commit_message(self, ref:str) -> str:
-        return self._run_git("log", "-1", "--format=%B", ref)
-
-    def amend_commit_message(self, msg: str) -> None:
-        self._run_git("commit", "--amend", "-m", msg)
 
 
 def _fetch_url(url: str, *,
