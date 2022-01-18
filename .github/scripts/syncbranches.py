@@ -1,29 +1,13 @@
 #!/usr/bin/env python3
 
-from collections import defaultdict
 from datetime import datetime
-from typing import cast, Any, Dict, List, Optional, Tuple, Union
-import os
+from typing import cast, Any, List, Optional, Tuple, Union
+from gitutils import get_git_repo_dir, fuzzy_list_to_dict
 
 
 def _check_output(items: List[str], encoding: str = "utf-8") -> str:
     from subprocess import check_output
     return check_output(items).decode(encoding)
-
-
-def fuzzy_list_to_dict(items: List[Tuple[str, str]]) -> Dict[str, List[str]]:
-    """
-    Converts list to dict preserving elements with duplicate keys
-    """
-    rc: Dict[str, List[str]] = defaultdict(lambda: [])
-    for (key, val) in items:
-        rc[key].append(val)
-    return dict(rc)
-
-
-def get_git_repo_dir() -> str:
-    from pathlib import Path
-    return os.getenv("GIT_REPO_DIR", str(Path(__file__).resolve().parent.parent))
 
 
 class GitCommit:
