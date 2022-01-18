@@ -135,7 +135,10 @@ def gh_update_pr(org: str, project: str, pr_num: int, *,
 
 
 def gh_graphql(query: str, **kwargs: Any) -> Dict[str, Any]:
-    return _fetch_url("https://api.github.com/graphql", data={"query": query, "variables": kwargs}, reader=json.load)
+    rc = _fetch_url("https://api.github.com/graphql", data={"query": query, "variables": kwargs}, reader=json.load)
+    if "errors" in rc:
+        raise RuntimeError(f"GraphQL query {query} failed: {rc['errors']}")
+    return rc
 
 
 def gh_get_pr_info(org: str, proj: str, pr_no: int) -> Any:
