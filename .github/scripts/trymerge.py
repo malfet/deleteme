@@ -6,6 +6,7 @@ import re
 from urllib.request import urlopen, Request
 from urllib.error import HTTPError
 from typing import cast, Any, Callable, Dict, List, Optional, Tuple
+from gitutils import get_git_remote_name, get_git_repo_dir
 
 
 GH_GET_PR_INFO_QUERY = """
@@ -79,15 +80,6 @@ RE_PULL_REQUEST_RESOLVED = re.compile(
 def _check_output(items: List[str], encoding: str = "utf-8") -> str:
     from subprocess import check_output
     return check_output(items).decode(encoding)
-
-
-def get_git_remote_name() -> str:
-    return os.getenv("GIT_REMOTE_NAME", "origin")
-
-
-def get_git_repo_dir() -> str:
-    from pathlib import Path
-    return os.getenv("GIT_REPO_DIR", str(Path(__file__).resolve().parent.parent))
 
 
 class GitRepo:
