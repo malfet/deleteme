@@ -21,6 +21,11 @@ def fuzzy_list_to_dict(items: List[Tuple[str, str]]) -> Dict[str, List[str]]:
     return dict(rc)
 
 
+def get_git_repo_dir() -> str:
+    from pathlib import Path
+    return os.getenv("GIT_REPO_DIR", str(Path(__file__).resolve().parent.parent))
+
+
 class GitCommit:
     commit_hash: str
     title: str
@@ -177,10 +182,22 @@ class GitRepo:
         self._run_git("push", self.remote, branch)
 
 
+def parse_args() -> Any:
+    from argparse import ArgumentParser
+    parser = ArgumentParser("Merge PR/branch into default branch")
+    parser.add_argument("--sync-branch", default="sync")
+    parser.add_argument("--default-branch", type=str, default="main")
+    parser.add_argument("--dry-run", action="store_true")
+    return parser.parse_args()
+
+
+def main() -> None:
+    args = parse_args()
+    repo = GitRepo(get_git_repo_dir())
+    repo.cherry_pick_commits(args.sync_branch, args.default_branch)
+    if not args.dry_run:
+        repo.push(args.default_branch)
+
+
 if __name__ == '__main__':
-    repo_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..'))
-    default_branch = 'main'
-    sync_branch = 'sync'
-    repo = GitRepo(repo_dir)
-    repo.cherry_pick_commits(sync_branch, default_branch)
-    repo.push(default_branch)
+    main()
