@@ -4,6 +4,10 @@ from collections import defaultdict
 from datetime import datetime
 from typing import cast, Any, Dict, List, Optional, Tuple, Union
 import os
+import re
+
+
+RE_GITHUB_URL_MATCH = re.compile("^https://.*@?github.com/(.+)/(.+)$")
 
 
 def get_git_remote_name() -> str:
@@ -184,6 +188,27 @@ class GitRepo:
 
     def push(self, branch: str) -> None:
         self._run_git("push", self.remote, branch)
+
+    def head_hash(self) -> str:
+        return self._run_git("show-ref", "--hash", "HEAD").strip()
+
+    def remote_url(self) -> str:
+        return self._run_git("remote", "get-url", self.remote)
+
+    def gh_owner_and_name(self) -> Tuple[str, str]:
+        url = os.getenv("GIT_REMOTE_URL", None)
+        if url is None:
+            url = self.remote_url()
+        rc = RE_GITHUB_URL_MATCH.match(url)
+        if rc is None:
+            raise RuntimeError(f"Unexpected url format {url}")
+        return cast(Tuple[str, str], rc.groups())
+
+    def commit_message(self, ref: str) -> str:
+        return self._run_git("log", "-1", "--format=%B", ref)
+
+    def amend_commit_message(self, msg: str) -> None:
+        self._run_git("commit", "--amend", "-m", msg)
 
 
 def parse_args() -> Any:
