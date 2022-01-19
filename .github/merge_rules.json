@@ -1,6 +1,6 @@
 [
    {
-    "name": "Text changes"
+    "name": "Text changes",
     "patterns": ["*.txt"],
     "approved_by": [],
     "mandatory_app_id": null
