@@ -5,7 +5,7 @@ import os
 import re
 from urllib.request import urlopen, Request
 from urllib.error import HTTPError
-from typing import Any, Callable, Dict, List, Optional, Tuple
+from typing import cast, Any, Callable, Dict, List, Optional, Tuple
 from gitutils import get_git_remote_name, get_git_repo_dir, patterns_to_regex, GitRepo
 
 
@@ -87,7 +87,7 @@ def _fetch_url(url: str, *,
                headers: Optional[Dict[str, str]] = None,
                data: Optional[Dict[str, Any]] = None,
                method: Optional[str] = None,
-               reader: Callable = lambda x: x.read()) -> Any:
+               reader: Callable[[Any], Any] = lambda x: x.read()) -> Any:
     if headers is None:
         headers = {}
     token = os.environ.get("GITHUB_TOKEN")
@@ -109,7 +109,7 @@ def fetch_json(url: str,
     headers = {'Accept': 'application/vnd.github.v3+json'}
     if params is not None and len(params) > 0:
         url += '?' + '&'.join(f"{name}={val}" for name, val in params.items())
-    return _fetch_url(url, headers=headers, data=data, reader=json.load)
+    return cast(List[Dict[str, Any]], _fetch_url(url, headers=headers, data=data, reader=json.load))
 
 
 def gh_post_comment(org: str, project: str, pr_num: int, comment: str, dry_run: bool = False) -> List[Dict[str, Any]]:
@@ -120,43 +120,16 @@ def gh_post_comment(org: str, project: str, pr_num: int, comment: str, dry_run: 
                       data={"body": comment})
 
 
-def gh_update_pr(org: str, project: str, pr_num: int, *,
-                 base: Optional[str] = None,
-                 state: Optional[str] = None,
-                 title: Optional[str] = None,
-                 body: Optional[str] = None,
-                 ) -> List[Dict[str, Any]]:
-    data = {}
-    if base is not None:
-        data["base"] = base
-    if body is not None:
-        data["body"] = body
-    if state is not None:
-        data["state"] = state
-    if title is not None:
-        data["title"] = title
-    return _fetch_url(f'https://api.github.com/repos/{org}/{project}/issues/{pr_num}',
-                      headers={'Accept': 'application/vnd.github.v3+json'},
-                      data=data,
-                      method="PATCH",
-                      reader=json.load)
-
-
 def gh_graphql(query: str, **kwargs: Any) -> Dict[str, Any]:
     rc = _fetch_url("https://api.github.com/graphql", data={"query": query, "variables": kwargs}, reader=json.load)
     if "errors" in rc:
         raise RuntimeError(f"GraphQL query {query} failed: {rc['errors']}")
-    return rc
+    return cast(Dict[str, Any], rc)
 
 
 def gh_get_pr_info(org: str, proj: str, pr_no: int) -> Any:
     rc = gh_graphql(GH_GET_PR_INFO_QUERY, name=proj, owner=org, number=pr_no)
     return rc["data"]["repository"]["pullRequest"]
-
-
-def gh_fetch_pr_diff(org: str, proj: str, pr_no: int) -> str:
-    headers = {'Accept': 'application/vnd.github.v3.diff'}
-    return _fetch_url(f'https://api.github.com/repos/{org}/{proj}/pulls/{pr_no}', headers=headers).decode("utf-8")
 
 
 def parse_args() -> Any:
@@ -182,13 +155,13 @@ class GitHubPR:
         return bool(self.info["isCrossRepository"])
 
     def base_ref(self) -> str:
-        return self.info["baseRefName"]
+        return cast(str, self.info["baseRefName"])
 
     def default_branch(self) -> str:
-        return self.info["baseRepository"]["defaultBranchRef"]["name"]
+        return cast(str, self.info["baseRepository"]["defaultBranchRef"]["name"])
 
     def head_ref(self) -> str:
-        return self.info["headRefName"]
+        return cast(str, self.info["headRefName"])
 
     def is_ghstack_pr(self) -> bool:
         return RE_GHSTACK_HEAD_REF.match(self.head_ref()) is not None
@@ -202,7 +175,7 @@ class GitHubPR:
             raise RuntimeError("Changed file count mismatch")
         return rc
 
-    def _get_reviewers(self) -> List[Tuple[str, bool]]:
+    def _get_reviewers(self) -> List[Tuple[str, str]]:
         reviews_count = int(self.info["latestReviews"]["totalCount"])
         if len(self.info["latestReviews"]["nodes"]) != reviews_count:
             raise RuntimeError("Can't fetch all PR reviews")
@@ -215,10 +188,10 @@ class GitHubPR:
         return int(self.info["commits"]["totalCount"])
 
     def get_pr_creator_login(self) -> str:
-        return self.info["author"]["login"]
+        return cast(str, self.info["author"]["login"])
 
     def get_committer_login(self, num: int = 0) -> str:
-        return self.info["commits"]["nodes"][num]["commit"]["author"]["user"]["login"]
+        return cast(str, self.info["commits"]["nodes"][num]["commit"]["author"]["user"]["login"])
 
     def get_committer_author(self, num: int = 0) -> str:
         node = self.info["commits"]["nodes"][num]["commit"]["author"]
@@ -245,10 +218,10 @@ class GitHubPR:
         return self.get_authors()[self.get_pr_creator_login()]
 
     def get_title(self) -> str:
-        return self.info["title"]
+        return cast(str, self.info["title"])
 
     def get_body(self) -> str:
-        return self.info["body"]
+        return cast(str, self.info["body"])
 
     def get_pr_url(self) -> str:
         return f"https://github.com/{self.org}/{self.project}/pull/{self.pr_num}"
@@ -261,7 +234,10 @@ class GitHubPR:
         for idx, rev in enumerate(reversed(rev_list)):
             msg = repo.commit_message(rev)
             m = RE_PULL_REQUEST_RESOLVED.search(msg)
-            assert self.org == m.group('owner') and self.project == m.group('repo')
+            if m is None:
+                raise RuntimeError(f"Could not find PR-resolved string in {msg} of ghstacked PR {self.pr_num}")
+            if self.org != m.group('owner') or self.project == m.group('repo'):
+                raise RuntimeError(f"PR {m.group('number')} resolved to wrong owner/repo pair")
             pr_num = int(m.group('number'))
             if pr_num != self.pr_num:
                 pr = GitHubPR(self.org, self.project, pr_num)
@@ -288,7 +264,7 @@ class GitHubPR:
             repo.push(self.default_branch())
 
 
-def read_merge_rules(repo: GitRepo) -> List[Dict[str, Any]]:
+def read_merge_rules(repo: GitRepo) -> List[Any]:
     from pathlib import Path
     from types import SimpleNamespace
     rules_path = Path(repo.repo_dir) / ".github" / "merge_rules.json"
@@ -308,7 +284,7 @@ def read_merge_rules(repo: GitRepo) -> List[Dict[str, Any]]:
             raise RuntimeError(f"{rule} patterns must be a list")
         if not isinstance(rule.approved_by, list):
             raise RuntimeError(f"{rule} approved_by must be a list")
-    return rc
+    return cast(List[Any], rc)
 
 
 def check_if_should_be_merged(pr: GitHubPR, repo: GitRepo) -> None:
@@ -316,27 +292,28 @@ def check_if_should_be_merged(pr: GitHubPR, repo: GitRepo) -> None:
     approved_by = set(pr.get_approved_by())
     rules = read_merge_rules(repo)
     for rule in rules:
+        rule_name = rule.name
         rule_approvers_set = set(rule.approved_by)
         patterns_re = patterns_to_regex(rule.patterns)
         approvers_intersection = approved_by.intersection(rule_approvers_set)
         # If rule requires approvers but they aren't the ones that reviewed PR
         if len(approvers_intersection) == 0 and len(rule_approvers_set) > 0:
-            print(f"Skipping rule {rule.name} due to no approvers overlap")
+            print(f"Skipping rule {rule_name} due to no approvers overlap")
             continue
         if hasattr(rule, "mandatory_app_id"):
             cs_conslusions = pr.get_check_suite_conclusions()
             mandatory_app_id = int(rule.mandatory_app_id)
             if mandatory_app_id not in cs_conslusions or cs_conslusions[mandatory_app_id] != "SUCCESS":
-                print(f"Skipping rule {rule.name} as mandatory app {mandatory_app_id} is not in {cs_conslusions}")
+                print(f"Skipping rule {rule_name} as mandatory app {mandatory_app_id} is not in {cs_conslusions}")
                 continue
         non_matching_files = []
         for fname in changed_files:
             if not patterns_re.match(fname):
                 non_matching_files.append(fname)
         if len(non_matching_files) > 0:
-            print(f"Skipping rule {rule.name} due to non-matching files: {non_matching_files}")
+            print(f"Skipping rule {rule_name} due to non-matching files: {non_matching_files}")
             continue
-        print(f"Matched rule {rule.name} for {pr.pr_num}")
+        print(f"Matched rule {rule_name} for {pr.pr_num}")
         return
     raise RuntimeError(f"PR {pr.pr_num} does not match merge rules")
 
