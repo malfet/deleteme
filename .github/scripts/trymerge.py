@@ -6,7 +6,7 @@ import re
 from urllib.request import urlopen, Request
 from urllib.error import HTTPError
 from typing import Any, Callable, Dict, List, Optional, Tuple
-from gitutils import get_git_remote_name, get_git_repo_dir, GitRepo
+from gitutils import get_git_remote_name, get_git_repo_dir, patterns_to_regex, GitRepo
 
 
 GH_GET_PR_INFO_QUERY = """
@@ -289,58 +289,6 @@ def read_merge_rules(repo: GitRepo) -> List[Dict[str, Any]]:
         assert isinstance(rule.patterns, list)
         assert isinstance(rule.approved_by, list)
     return rc
-
-
-class PeekableIterator:
-    def __init__(self, val: str) -> None:
-        self._val = val
-        self._idx = -1
-
-    def peek(self) -> Optional[chr]:
-        if self._idx + 1 >= len(self._val):
-            return None
-        return self._val[self._idx + 1]
-
-    def __iter__(self):
-        return self
-
-    def __next__(self):
-        rc = self.peek()
-        if rc is None:
-            raise StopIteration
-        self._idx += 1
-        return rc
-
-
-def patterns_to_regex(allowed_patterns: List[str]) -> re.Pattern:
-    """
-    pattern is glob-like, i.e. the only special sequences it has are:
-      - ? - matches single character
-      - * - matches any non-folder separator characters
-      - ** - matches any characters
-      Assuming that patterns are free of braces and backslashes
-      the only character that needs to be escaped are dot and plus
-    """
-    rc = "("
-    for idx, pattern in enumerate(allowed_patterns):
-        if idx > 0:
-            rc += "|"
-        pattern_ = PeekableIterator(pattern)
-        for c in pattern_:
-            if c == ".":
-                rc += "\\."
-            elif c == "+":
-                rc += "\\+"
-            elif c == "*":
-                if pattern_.peek() == "*":
-                    next(pattern_)
-                    rc += ".+"
-                else:
-                    rc += "[^/]+"
-            else:
-                rc += c
-    rc += ")"
-    return re.compile(rc)
 
 
 def check_if_should_be_merged(pr: GitHubPR, repo: GitRepo) -> None:
