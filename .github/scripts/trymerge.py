@@ -5,7 +5,7 @@ import os
 import re
 from urllib.request import urlopen, Request
 from urllib.error import HTTPError
-from typing import cast, Any, Callable, Dict, List, Optional, Tuple
+from typing import Any, Callable, Dict, List, Optional, Tuple
 from gitutils import get_git_remote_name, get_git_repo_dir, GitRepo
 
 
@@ -273,10 +273,98 @@ class GitHubPR:
             repo.push(self.default_branch())
 
 
+def read_merge_rules(repo: GitRepo) -> List[Dict[str, Any]]:
+    from pathlib import Path
+    from types import SimpleNamespace
+    rules_path = Path(repo.repo_dir) / ".github" / "merge_rules.json"
+    if not rules_path.exists():
+        print(f"{rules_path} does not exist, returning empty rules")
+        return []
+    with open(rules_path) as fp:
+        rc = json.load(fp, object_hook=lambda x: SimpleNamespace(**x))
+    # Validate rules
+    for rule in rc:
+        assert set(rule.__dict__.keys()) == set('name', 'patterns', 'approved_by')
+        assert isinstance(rule.name, str)
+        assert isinstance(rule.patterns, list)
+        assert isinstance(rule.approved_by, list)
+    return rc
+
+
+class PeekableIterator:
+    def __init__(self, val: str) -> None:
+        self._val = val
+        self._idx = -1
+
+    def peek(self) -> Optional[chr]:
+        if self._idx + 1 >= len(self._val):
+            return None
+        return self._val[self._idx + 1]
+
+    def __iter__(self):
+        return self
+
+    def __next__(self):
+        rc = self.peek()
+        if rc is None:
+            raise StopIteration
+        self._idx += 1
+        return rc
+
+
+def patterns_to_regex(allowed_patterns: List[str]) -> re.Pattern:
+    """
+    pattern is glob-like, i.e. the only special sequences it has are:
+      - ? - matches single character
+      - * - matches any non-folder separator characters
+      - ** - matches any characters
+      Assuming that patterns are free of braces and backslashes
+      the only character that needs to be escaped are dot and plus
+    """
+    rc = "("
+    for idx, pattern in enumerate(allowed_patterns):
+        if idx > 0:
+            rc += "|"
+        pattern_ = PeekableIterator(pattern)
+        for c in pattern_:
+            if c == ".":
+                rc += "\\."
+            elif c == "+":
+                rc += "\\+"
+            elif c == "*":
+                if pattern_.peek() == "*":
+                    next(pattern_)
+                    rc += ".+"
+                else:
+                    rc += "[^/]+"
+            else:
+                rc += c
+    rc += ")"
+    return re.compile(rc)
+
+
 def check_if_should_be_merged(pr: GitHubPR, repo: GitRepo) -> None:
     changed_files = pr.get_changed_files()
-    approved_by = pr.get_approved_by()
-    author = pr.get_author()
+    approved_by = set(pr.get_approved_by())
+    rules = read_merge_rules(repo)
+    for rule in rules:
+        rule_approvers_set = set(rule.approved_by)
+        patterns_re = patterns_to_regex(rule.patterns)
+        approvers_intersection = approved_by.intersection(rule_approvers_set)
+        # If rule requires approvers but they aren't the ones that reviewed PR
+        if len(approvers_intersection) == 0 and len(rule_approvers_set) > 0:
+            print(f"Skipping rule {rule.name} due to no approvers overlap")
+            continue
+        non_matching_files = []
+        for fname in changed_files:
+            if not patterns_re.match(fname):
+                non_matching_files.append(fname)
+        if len(non_matching_files) > 0:
+            print(f"Skipping rule {rule.name} due to non-matching files: {non_matching_files}")
+            continue
+        print(f"Matched rule {rule.name}")
+        return
+    raise RuntimeError("PR does not match merge rules")
 
 
 def main() -> None:
