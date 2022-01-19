@@ -42,6 +42,14 @@ query ($owner: String!, $name: String!, $number: Int!) {
               name
             }
             oid
+            checkSuites(filterBy: {appId: 12274}, first: 1) {
+              nodes {
+                app {
+                  databaseId
+                }
+                conclusion
+              }
+            }
           }
         }
         totalCount
@@ -216,6 +224,13 @@ class GitHubPR:
         node = self.info["commits"]["nodes"][num]["commit"]["author"]
         return f"{node['name']} <{node['email']}>"
 
+    def get_check_suite_conclusions(self) -> Dict[int, str]:
+        last_commit = self.info["commits"]["nodes"][-1]["commit"]
+        rc = {}
+        for node in last_commit["checkSuites"]["nodes"]:
+            rc[int(node["app"]["databaseId"])] = node["conclusion"]
+        return rc
+
     def get_authors(self) -> Dict[str, str]:
         rc = {}
         for idx in range(self.get_commit_count()):
@@ -284,10 +299,15 @@ def read_merge_rules(repo: GitRepo) -> List[Dict[str, Any]]:
         rc = json.load(fp, object_hook=lambda x: SimpleNamespace(**x))
     # Validate rules
     for rule in rc:
-        assert set(rule.__dict__.keys()) == {'name', 'patterns', 'approved_by'}
-        assert isinstance(rule.name, str)
-        assert isinstance(rule.patterns, list)
-        assert isinstance(rule.approved_by, list)
+        mandatory_keys = {"name", "patterns", "approved_by"}
+        if not mandatory_keys.issubset(set(rule.__dict__)):
+            raise RuntimeError(f"{mandatory_keys} not found in rule {rule}")
+        if not isinstance(rule.name, str):
+            raise RuntimeError(f"{rule} name must be a string")
+        if not isinstance(rule.patterns, list):
+            raise RuntimeError(f"{rule} patterns must be a list")
+        if not isinstance(rule.approved_by, list):
+            raise RuntimeError(f"{rule} approved_by must be a list")
     return rc
 
 
@@ -303,6 +323,12 @@ def check_if_should_be_merged(pr: GitHubPR, repo: GitRepo) -> None:
         if len(approvers_intersection) == 0 and len(rule_approvers_set) > 0:
             print(f"Skipping rule {rule.name} due to no approvers overlap")
             continue
+        if hasattr(rule, "mandatory_app_id"):
+            cs_conslusions = pr.get_check_suite_conclusions()
+            mandatory_app_id = int(rule.mandatory_app_id)
+            if mandatory_app_id not in cs_conslusions or cs_conslusions[mandatory_app_id] != "SUCCESS":
+                print(f"Skipping rule {rule.name} as mandatory app {mandatory_app_id} is not in {cs_conslusions}")
+                continue
         non_matching_files = []
         for fname in changed_files:
             if not patterns_re.match(fname):
