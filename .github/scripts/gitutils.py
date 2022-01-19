@@ -210,3 +210,56 @@ class GitRepo:
     def amend_commit_message(self, msg: str) -> None:
         self._run_git("commit", "--amend", "-m", msg)
 
+
+class PeekableIterator:
+    def __init__(self, val: str) -> None:
+        self._val = val
+        self._idx = -1
+
+    def peek(self) -> Optional[str]:
+        if self._idx + 1 >= len(self._val):
+            return None
+        return self._val[self._idx + 1]
+
+    def __iter__(self) -> Any:
+        return self
+
+    def __next__(self) -> str:
+        rc = self.peek()
+        if rc is None:
+            raise StopIteration
+        self._idx += 1
+        return rc
+
+
+def patterns_to_regex(allowed_patterns: List[str]) -> re.Pattern:
+    """
+    pattern is glob-like, i.e. the only special sequences it has are:
+      - ? - matches single character
+      - * - matches any non-folder separator characters
+      - ** - matches any characters
+      Assuming that patterns are free of braces and backslashes
+      the only character that needs to be escaped are dot and plus
+    """
+    rc = "("
+    for idx, pattern in enumerate(allowed_patterns):
+        if idx > 0:
+            rc += "|"
+        pattern_ = PeekableIterator(pattern)
+        for c in pattern_:
+            if c == ".":
+                rc += "\\."
+            elif c == "+":
+                rc += "\\+"
+            elif c == "*":
+                if pattern_.peek() == "*":
+                    next(pattern_)
+                    rc += ".+"
+                else:
+                    rc += "[^/]+"
+            else:
+                rc += c
+    rc += ")"
+    return re.compile(rc)
+
+
