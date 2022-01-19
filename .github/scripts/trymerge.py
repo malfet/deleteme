@@ -284,7 +284,7 @@ def read_merge_rules(repo: GitRepo) -> List[Dict[str, Any]]:
         rc = json.load(fp, object_hook=lambda x: SimpleNamespace(**x))
     # Validate rules
     for rule in rc:
-        assert set(rule.__dict__.keys()) == set('name', 'patterns', 'approved_by')
+        assert set(rule.__dict__.keys()) == {'name', 'patterns', 'approved_by'}
         assert isinstance(rule.name, str)
         assert isinstance(rule.patterns, list)
         assert isinstance(rule.approved_by, list)
@@ -362,9 +362,9 @@ def check_if_should_be_merged(pr: GitHubPR, repo: GitRepo) -> None:
         if len(non_matching_files) > 0:
             print(f"Skipping rule {rule.name} due to non-matching files: {non_matching_files}")
             continue
-        print(f"Matched rule {rule.name}")
+        print(f"Matched rule {rule.name} for {pr.pr_num}")
         return
-    raise RuntimeError("PR does not match merge rules")
+    raise RuntimeError(f"PR {pr.pr_num} does not match merge rules")
 
 
 def main() -> None:
