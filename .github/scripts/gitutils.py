@@ -261,5 +261,3 @@ def patterns_to_regex(allowed_patterns: List[str]) -> re.Pattern:
                 rc += c
     rc += ")"
     return re.compile(rc)
-
-
