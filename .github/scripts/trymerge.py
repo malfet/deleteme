@@ -55,7 +55,7 @@ query ($owner: String!, $name: String!, $number: Int!) {
         }
         totalCount
       }
-      changedFiles,
+      changedFiles
       files(last: 100) {
         nodes {
           path
@@ -65,9 +65,9 @@ query ($owner: String!, $name: String!, $number: Int!) {
         nodes {
           author {
             login
-          },
+          }
           state
-        },
+        }
         totalCount
       }
     }
