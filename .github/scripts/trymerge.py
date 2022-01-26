@@ -375,8 +375,8 @@ def try_revert(repo: GitRepo, pr: GitHubPR, dry_run: bool = False) -> None:
     author_association = pr.get_comment_author_association()
     author_login = pr.get_comment_author_login()
     # For some reason, one can not be a member of private repo, only CONTRIBUTOR
-    expected_association = "MEMBER" if pr.is_base_repo_private() else "CONTRIBUTOR"
-    if author_association != expected_association:
+    expected_association = "CONTRIBUTOR" if pr.is_base_repo_private() else "MEMBER"
+    if author_association != expected_association and author_association != "OWNER":
         return post_comment(f"Will not revert as @{author_login} is not a {expected_association}, but {author_association}")
 
     # Raises exception if matching rule is not found
