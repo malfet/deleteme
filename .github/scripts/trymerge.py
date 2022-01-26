@@ -366,8 +366,10 @@ def try_revert(repo: GitRepo, pr: GitHubPR, dry_run: bool = False) -> None:
         raise RuntimeError(f"Comment {pr.get_comment_body()} does not seem to be a valid revert command")
     if pr.get_comment_editor_login() is not None:
         return post_comment(f"Don't want to revert based on edited command")
-    if pr.get_comment_author_association() != "MEMBER":
-        return post_comment(f"Will not revert as @{pr.get_comment_author_login()} is not a member")
+    author_association = pr.get_comment_author_association()
+    author_login = pr.get_comment_author_login()
+    if author_association != "MEMBER":
+        return post_comment(f"Will not revert as @{author_login} is not a member, but {author_association}")
 
     find_matching_merge_rule(pr, repo)
     commit_sha = pr.get_merge_commit()
@@ -384,7 +386,7 @@ def try_revert(repo: GitRepo, pr: GitHubPR, dry_run: bool = False) -> None:
     repo.revert(commit_sha)
     msg = repo.commit_message("HEAD")
     msg = re.sub(RE_PULL_REQUEST_RESOLVED, "", msg)
-    msg += f"\nReverted on behalf of @{pr.get_comment_author_login()}\n"
+    msg += f"\nReverted on behalf of @{author_login}\n"
     repo.amend_commit_message(msg)
     repo.push(pr.default_branch(), dry_run)
     if not dry_run:
