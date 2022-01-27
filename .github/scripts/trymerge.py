@@ -430,9 +430,9 @@ def main() -> None:
         pr.merge_into(repo, dry_run=args.dry_run)
     except Exception as e:
         msg = f"Merge failed due to {e}"
-            run_url = os.getenv("GH_RUN_URL")
-            if run_url is not None:
-                msg += "\nRaised by {run_url}"
+        run_url = os.getenv("GH_RUN_URL")
+        if run_url is not None:
+            msg += "\nRaised by {run_url}"
         gh_post_comment(org, project, args.pr_num, msg, dry_run=args.dry_run)
 
 
