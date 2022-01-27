@@ -26,4 +26,5 @@ jobs:
           git config --global user.name "Nekto Scromny"
       - name: Sync branches
         run: |
+          echo ${GITHUB_RUN_ID}
           python3 .github/scripts/syncbranches.py --sync-branch="${GITHUB_REF#refs/heads/}" --default-branch=main
