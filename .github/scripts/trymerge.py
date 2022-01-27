@@ -259,17 +259,17 @@ class GitHubPR:
         return f"https://github.com/{self.org}/{self.project}/pull/{self.pr_num}"
 
     def get_comment_body(self, num: int = -1) -> str:
-        return self.info["comments"]["nodes"][num]["bodyText"]
+        return cast(str, self.info["comments"]["nodes"][num]["bodyText"])
 
     def get_comment_author_login(self, num: int = -1) -> str:
-        return self.info["comments"]["nodes"][num]["author"]["login"]
+        return cast(str, self.info["comments"]["nodes"][num]["author"]["login"])
 
     def get_comment_editor_login(self, num: int = -1) -> Optional[str]:
         rc = self.info["comments"]["nodes"][num]["editor"]
         return rc["login"] if rc is not None else None
 
     def get_comment_author_association(self, num: int = -1) -> str:
-        return self.info["comments"]["nodes"][num]["authorAssociation"]
+        return cast(str, self.info["comments"]["nodes"][num]["authorAssociation"])
 
     def merge_ghstack_into(self, repo: GitRepo) -> None:
         assert self.is_ghstack_pr()
@@ -386,7 +386,7 @@ def try_revert(repo: GitRepo, pr: GitHubPR, dry_run: bool = False) -> None:
         commits = repo.commits_resolving_gh_pr(pr.pr_num)
         if len(commits) == 0:
             raise RuntimeError("Can't find any commits resolving PR")
-        commit_sha = commits[-1]
+        commit_sha = commits[0]
     msg = repo.commit_message(commit_sha)
     rc = RE_DIFF_REV.search(msg)
     if rc is not None:
@@ -395,7 +395,7 @@ def try_revert(repo: GitRepo, pr: GitHubPR, dry_run: bool = False) -> None:
     repo.revert(commit_sha)
     msg = repo.commit_message("HEAD")
     msg = re.sub(RE_PULL_REQUEST_RESOLVED, "", msg)
-    msg += f"\nReverted on behalf of @{author_login}\n"
+    msg += f"\nReverted {pr.get_pr_url()} on behalf of @{author_login}\n"
     repo.amend_commit_message(msg)
     repo.push(pr.default_branch(), dry_run)
     if not dry_run:
