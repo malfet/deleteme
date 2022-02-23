@@ -210,10 +210,10 @@ class GitHubPR:
             raise RuntimeError("Can't fetch all PR reviews")
         reviews = {}
         for node in nodes:
-          author = node["author"]["login"]
-          state = node["state"]
-          if state != "COMMENTED":
-              reviews[author] = state
+            author = node["author"]["login"]
+            state = node["state"]
+            if state != "COMMENTED":
+                reviews[author] = state
         return list(reviews.items())
 
     def get_approved_by(self) -> List[str]:
