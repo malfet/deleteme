@@ -228,10 +228,10 @@ class GitRepo:
                 # Check if push were rejected because branch is stale
                 if len(e.args) != 1:
                     raise
-                if re.search("\[rejected\].+\(fetch first\)$", e.args[0]) is None:
+                if re.search("\[rejected\].+\(fetch first\)\n", e.args[0]) is None:
                     raise
                 self.fetch()
-                self._run_git("rebase", f"{self.remote}/{self.branch}")
+                self._run_git("rebase", f"{self.remote}/{branch}")
 
     def head_hash(self) -> str:
         return self._run_git("show-ref", "--hash", "HEAD").strip()
