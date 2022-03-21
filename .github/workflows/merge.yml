@@ -27,6 +27,8 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.MERGEBOT_TOKEN }}
           PR_NUM: ${{ github.event.client_payload.pr_num }}
+          FOOBAR: ${{ github.event.client_payload.foobar }}
           GH_RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
         run: |
+          echo "${FOOBAR}"
           python3 .github/scripts/trymerge.py "${PR_NUM}"
