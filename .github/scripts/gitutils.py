@@ -226,9 +226,7 @@ class GitRepo:
                     self._run_git("push", self.remote, branch)
             except RuntimeError as e:
                 # Check if push were rejected because branch is stale
-                if len(e.args) != 1:
-                    raise
-                if re.search("\[rejected\].+\(fetch first\)\n", e.args[0]) is None:
+                if len(e.args) == 0 or re.search(r"\[rejected\].+\(fetch first\)\n", e.args[0]) is None:
                     raise
                 self.fetch()
                 self._run_git("rebase", f"{self.remote}/{branch}")
