@@ -3,6 +3,6 @@
     "name": "Text changes",
     "patterns": ["*.txt"],
     "approved_by": [],
-    "mandatory_checks_name": []
+    "mandatory_checks_name": ["Foobar"]
    }
 ]
