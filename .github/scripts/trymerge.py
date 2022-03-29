@@ -600,7 +600,7 @@ def find_matching_merge_rule(pr: GitHubPR, repo: GitRepo, force: bool = False) -
                 non_matching_files.append(fname)
         if len(non_matching_files) > 0:
             score = len(changed_files) - len(non_matching_files)
-            if score > reject_reason:
+            if score > reject_reason_score:
                 reject_reason_score = score
                 reject_reason = (f"{score} files matched rule {rule_name}, but there are still non-matching files: " +
                                  f"{','.join(non_matching_files[:5])}{', ...' if len(non_matching_files) > 5 else ''}")
