@@ -1,0 +1,19 @@
+name: Compile main
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  do_compile:
+    runs-on: self-hosted
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v2
+      - name: Compile and run
+        run: |
+          uname -a
+          clang++ -o hello hello.cpp
+          file hello
+          ./hello
