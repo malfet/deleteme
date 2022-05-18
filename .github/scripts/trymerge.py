@@ -860,7 +860,7 @@ def try_revert(repo: GitRepo, pr: GitHubPR, *, dry_run: bool = False, comment_id
     msg = repo.commit_message("HEAD")
     msg = re.sub(RE_PULL_REQUEST_RESOLVED, "", msg)
     msg += f"\nReverted {pr.get_pr_url()} on behalf of {prefix_with_github_url(author_login)}"
-    msg ++ f" due to {reason}\n" if reason is not None else "\n"
+    msg += f" due to {reason}\n" if reason is not None else "\n"
     repo.amend_commit_message(msg)
     repo.push(pr.default_branch(), dry_run)
     if not dry_run:
