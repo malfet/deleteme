@@ -7,14 +7,17 @@ on:
 
 jobs:
   do_compile:
-    runs-on: self-hosted
+    runs-on: macos-12
+    # runs-on: self-hosted
     steps:
       - name: Checkout repo
         uses: actions/checkout@v2
       - name: Compile and run
-        shell: arch -arch arm64 zsh {0}
+        # shell: arch -arch arm64 zsh {0}
         run: |
           uname -a
           clang++ -o hello hello.cpp
           file hello
           ./hello
+          clang++ -o query_metal query_metal.mm -framework Metal -framework Foundation -lobjc
+          ./query_metal
