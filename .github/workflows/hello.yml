@@ -14,7 +14,7 @@ jobs:
         run: echo "Hello World"
 
       - name: Print on Push to foobar
-        if: ${{ github.event_name == 'push' }}
+        if: ${{ github.event_name == 'push' && github.event.ref == 'refs/heads/foobar' }}
         run: echo "Hello on push ${{ github.event.ref }}"
 
 
