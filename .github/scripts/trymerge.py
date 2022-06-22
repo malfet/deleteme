@@ -918,6 +918,7 @@ def try_revert(repo: GitRepo, pr: GitHubPR, *,
     msg += revert_msg
     repo.amend_commit_message(msg)
     repo.push(pr.default_branch(), dry_run)
+    post_comment(f"@{pr.get_pr_creator_login()} your PR has been successfully reverted.")
     if not dry_run:
         gh_add_labels(pr.org, pr.project, pr.pr_num, ["reverted"])
         gh_post_commit_comment(pr.org, pr.project, commit_sha, revert_msg)
