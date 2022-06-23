@@ -16,6 +16,8 @@ jobs:
         # shell: arch -arch arm64 zsh {0}
         run: |
           uname -a
+          sysctl machdep.cpu.brand_string
+          sysctl machdep.cpu.core_count
           clang++ -o hello hello.cpp
           file hello
           ./hello
