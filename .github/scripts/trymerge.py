@@ -302,7 +302,7 @@ query ($owner: String!, $name: String!, $number: Int!, $cursor: String!) {
 """
 
 RE_GHSTACK_HEAD_REF = re.compile(r"^(gh/[^/]+/[0-9]+/)head$")
-RE_GHSTACK_DESC = re.compile(r'Stack.*:\r?\n(\* [^\r\n]+\r?\n)+', re.MULTILINE)
+RE_GHSTACK_SOURCE_ID = re.compile(r'^ghstack-source-id: (.+)\n?', re.MULTILINE)
 RE_PULL_REQUEST_RESOLVED = re.compile(
     r'Pull Request resolved: '
     r'https://github.com/(?P<owner>[^/]+)/(?P<repo>[^/]+)/pull/(?P<number>[0-9]+)',
@@ -711,20 +711,12 @@ class GitHubPR:
                 # Raises exception if matching rule is not found
                 find_matching_merge_rule(pr, repo, force=force, skip_internal_checks=can_skip_internal_checks(self, comment_id))
 
+            # Adding the url here makes it clickable within the Github UI
+            approved_by_urls = ', '.join(prefix_with_github_url(login) for login in approved_by)
             repo.cherry_pick(rev)
-            repo.amend_commit_message(self.gen_commit_message(filter_ghstack=True))
-
-    def gen_commit_message(self, filter_ghstack: bool = False) -> str:
-        """ Fetches title and body from PR description
-            adds reviewed by, pull request resolved and optionally
-            filters out ghstack info """
-        # Adding the url here makes it clickable within the Github UI
-        approved_by_urls = ', '.join(prefix_with_github_url(login) for login in self.get_approved_by())
-        msg = self.get_title() + f" (#{self.pr_num})\n\n"
-        msg += self.get_body() if not filter_ghstack else re.sub(RE_GHSTACK_DESC, "", self.get_body())
-        msg += f"\nPull Request resolved: {self.get_pr_url()}\n"
-        msg += f"Approved by: {approved_by_urls}\n"
-        return msg
+            msg = re.sub(RE_GHSTACK_SOURCE_ID, "", msg)
+            msg += f"\nApproved by: {approved_by_urls}\n"
+            repo.amend_commit_message(msg)
 
     def merge_into(self, repo: GitRepo, *, force: bool = False, dry_run: bool = False, comment_id: Optional[int] = None) -> None:
         # Raises exception if matching rule is not found
@@ -732,7 +724,11 @@ class GitHubPR:
         if repo.current_branch() != self.default_branch():
             repo.checkout(self.default_branch())
         if not self.is_ghstack_pr():
-            msg = self.gen_commit_message()
+            # Adding the url here makes it clickable within the Github UI
+            approved_by_urls = ', '.join(prefix_with_github_url(login) for login in self.get_approved_by())
+            msg = self.get_title() + f" (#{self.pr_num})\n\n" + self.get_body()
+            msg += f"\nPull Request resolved: {self.get_pr_url()}\n"
+            msg += f"Approved by: {approved_by_urls}\n"
             pr_branch_name = f"__pull-request-{self.pr_num}__init__"
             repo.fetch(f"pull/{self.pr_num}/head", pr_branch_name)
             repo._run_git("merge", "--squash", pr_branch_name)
