@@ -6,7 +6,7 @@ on:
       - main
       - foobar
     tags:
-      - *
+      - f*
 
 jobs:
   print_hello:
