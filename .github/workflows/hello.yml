@@ -13,7 +13,7 @@ jobs:
     name: "Print Hello"
     runs-on: ubuntu-20.04
     env:
-      LIMIT: ${{ github.workflow }}-${{ github.event.pull_request.number || github.event.push.ref || github.sha }}-${{ github.event_name == 'workflow_dispatch' }}
+      LIMIT: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref || github.sha }}-${{ github.event_name == 'workflow_dispatch' }}
     steps:
       - name: Print Hello
         run: echo "Hello World"
