@@ -1,0 +1,13 @@
+on:
+  push:
+    branches:
+      - main
+  pull_request_review:
+    types: [submitted]
+    if: ${{ github.event.review.state == 'approved' }}
+
+jobs:
+  approved:
+    runs-on: ubuntu-latest
+    steps:
+      - run: echo "This PR was approved"
