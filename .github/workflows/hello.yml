@@ -25,6 +25,7 @@ jobs:
 
       - name: Install buck
         run: |
+          sudo apt update
           wget -q https://github.com/facebook/buck/releases/download/v2021.05.05.01/buck.2021.05.05.01_all.deb
           sudo apt install ./buck.2021.05.05.01_all.deb
 
