@@ -11,7 +11,7 @@ on:
 jobs:
   print_hello:
     name: "Print Hello"
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-latest
     env:
       REF_TYPE: ${{ github.ref_type }}
       LIMIT: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref_name }}-${{ github.ref_type == 'branch' && github.sha}}
@@ -22,5 +22,10 @@ jobs:
       - name: Print on Push to foobar
         if: ${{ github.event_name == 'push' && github.event.ref == 'refs/heads/foobar' }}
         run: echo "Hello on push ${{ github.event.ref }}"
+
+      - name: Install buck
+        run: |
+          wget https://github.com/facebook/buck/releases/download/v2021.01.12.01/buck.2021.01.12.01_all.deb
+          sudo apt install ./buck.2021.01.12.01_all.deb
 
 
