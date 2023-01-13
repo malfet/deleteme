@@ -8,6 +8,12 @@ jobs:
   do_revert:
     runs-on: ubuntu-20.04
     steps:
+      - name: Checkout repo
+        uses: actions/checkout@v2
+        with:
+          fetch-depth: 0
+          token: ${{ secrets.MERGEBOT_TOKEN }}
+
       - name: Setup Python
         uses: actions/setup-python@v2
         with:
@@ -15,12 +21,6 @@ jobs:
           architecture: x64
           cache: 'pip'
       - run: pip install pyyaml
-
-      - name: Checkout repo
-        uses: actions/checkout@v2
-        with:
-          fetch-depth: 0
-          token: ${{ secrets.MERGEBOT_TOKEN }}
 
       - name: Setup committer id
         run: |
