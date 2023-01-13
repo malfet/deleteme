@@ -13,6 +13,9 @@ jobs:
         with:
           python-version: 3.8
           architecture: x64
+          cache: 'pip'
+      - run: pip install pyyaml
+
       - name: Checkout repo
         uses: actions/checkout@v2
         with:
