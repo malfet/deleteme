@@ -28,6 +28,8 @@ jobs:
 
       - name: Checkout repo
         uses: actions/checkout@v2
+        with:
+          fetch-depth: 1
 
       - name: Show files changed
         run: |
