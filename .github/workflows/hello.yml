@@ -32,6 +32,4 @@ jobs:
       - name: Show files changed
         run: |
           set -ex
-          git log
-          git diff-tree HEAD
-          git diff
+          git diff --name-only --diff-filter=ACMRT ${{ github.event.pull_request.base.sha }} ${{ github.sha }}
