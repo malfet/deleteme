@@ -1,0 +1,22 @@
+name: Fake build workflow
+
+on:
+  pull_request:
+  push:
+    branches:
+      - nightly
+      - main
+      - release/*
+    tags:
+        # NOTE: Binary build pipelines should only get triggered on release candidate builds
+        # Release candidate tags look like: v1.11.0-rc1
+        - v[0-9]+.[0-9]+.[0-9]+-rc[0-9]+
+  workflow_dispatch:
+
+jobs:
+  build:
+    name: "Foobar"
+    uses: ./.github/workflows/fake_composite_workflow.yml
+    with:
+      trigger-event: ${{ github.event_name }}
+
