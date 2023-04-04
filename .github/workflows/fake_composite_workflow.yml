@@ -14,6 +14,9 @@ on:
 jobs:
   print_env:
     runs-on: ubuntu-latest
+    env:
+      EVENT_REF: ${{ github.event.ref }}
+      EVENT_NAME: ${{ github.event_name }}
     steps:
       - run: echo ${{ github.event.ref }}
       - run: echo ${{ inputs.trigger-event }}
