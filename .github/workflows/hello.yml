@@ -13,6 +13,9 @@ jobs:
     name: "Print Hello"
     runs-on: ubuntu-latest
     env:
+      TITLE: ${{ github.event.pull_request.title }}
+      BODY: ${{ github.event.pull_request.body }}
+      LABELS: ${{ github.pull_request.labels }}
       REF_TYPE: ${{ github.ref_type }}
       LIMIT: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref_name }}-${{ github.ref_type == 'branch' && github.sha}}
     steps:
@@ -23,10 +26,13 @@ jobs:
         if: ${{ github.event_name == 'push' && github.event.ref == 'refs/heads/foobar' }}
         run: echo "Hello on push ${{ github.event.ref }}"
 
-      - name: Install buck
+      - name: Checkout repo
+        uses: actions/checkout@v2
+        with:
+          fetch-depth: 1
+
+      - name: Show files changed
         run: |
-          sudo apt update -q
-          wget -q https://github.com/facebook/buck/releases/download/v2021.01.12.01/buck.2021.01.12.01_all.deb
-          sudo apt install ./buck.2021.01.12.01_all.deb
-
-
+          set -ex
+          git show
+          git diff --name-only --diff-filter=ACMRT ${{ github.event.pull_request.base.sha }} ${{ github.sha }}
