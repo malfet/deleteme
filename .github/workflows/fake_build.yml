@@ -16,7 +16,7 @@ on:
 jobs:
   build:
     name: "Foobar"
-    uses: ./.github/workflows/fake_composite_workflow.yml
+    uses: malfet/deleteme/.github/workflows/fake_composite_workflow.yml@main
     with:
       trigger-event: ${{ github.event_name }}
 
