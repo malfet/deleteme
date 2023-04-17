@@ -8,5 +8,11 @@ int main() {
         id<MTLDevice>  device = devices[i];
         NSLog(@"Found device %@ isLowPower %s", device.name, device.isLowPower ? "true" : "false");
      }
+     id mpsCD = NSClassFromString(@"MPSGraph");
+     NSLog(@"mpsCD is %@", mpsCD);
+     if ([mpsCD instancesRespondToSelector:@selector
+                 (LSTMWithSourceTensor:recurrentWeight:inputWeight:bias:initState:initCell:descriptor:name:)] == NO) {
+         NSLog(@"MPS graph is too old");
+     }
   }
 }
