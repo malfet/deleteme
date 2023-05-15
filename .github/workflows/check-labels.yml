@@ -28,11 +28,6 @@ jobs:
           check-latest: false
           cache: pip
 
-      - name: Install requirements
-        id: requirements
-        run: |
-          pip install -r .github/requirements-gha-cache.txt --user
-
       - name: Check labels
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
