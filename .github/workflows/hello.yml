@@ -13,6 +13,7 @@ jobs:
   print_hello:
     name: "Print Hello"
     runs-on: ubuntu-latest
+    environment: mergebot
     env:
       REF_TYPE: ${{ github.ref_type }}
       DUMMY: ${{ secrets.DUMMY_SECRET }}
