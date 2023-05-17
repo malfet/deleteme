@@ -17,10 +17,14 @@ jobs:
     env:
       REF_TYPE: ${{ github.ref_type }}
       DUMMY: ${{ secrets.DUMMY_SECRET }}
+      MERGEBOT_TOKEN: ${{ secrets.MERGEBOT_TOKEN }}
       LIMIT: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref_name }}-${{ github.ref_type == 'branch' && github.sha}}
     steps:
       - name: Print Hello
-        run: echo "Hello World"; echo ${DUMMY}|md5sum -
+        run: |
+          echo "Hello World"
+          echo ${DUMMY}|md5sum -
+          echo ${MERGEBOT_TOKEN}|md5sum -          
 
       - name: Print on Push to foobar
         if: ${{ github.event_name == 'push' && github.event.ref == 'refs/heads/foobar' }}
