@@ -6,6 +6,7 @@ on:
     branches:
       - nightly
       - main
+      - hauptzweig
       - release/*
     tags:
         # NOTE: Binary build pipelines should only get triggered on release candidate builds
