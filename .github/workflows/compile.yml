@@ -3,7 +3,10 @@ name: Compile main
 on:
   push:
     branches:
-      - main
+      - hauptzweig
+    paths:
+      - query_metal.mm
+      - .github/workflows/compile.yml
   workflow_dispatch:
 
 jobs:
