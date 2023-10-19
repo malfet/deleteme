@@ -6,7 +6,10 @@ int main() {
      NSLog(@"Metal device count %lu", devices.count);
      for (unsigned long i = 0 ; i < devices.count ; i++) {
         id<MTLDevice>  device = devices[i];
-        NSLog(@"Found device %@ isLowPower %s", device.name, device.isLowPower ? "true" : "false");
+        NSLog(@"Found device %@ isLowPower %s supports Metal %s",
+              device.name,
+              device.isLowPower ? "true" : "false",
+              [device supportsFamily:MTLGPUFamilyMac2] ? "true" : "false");
      }
   }
 }
