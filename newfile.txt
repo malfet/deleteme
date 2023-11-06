@@ -1,2 +1,3 @@
 New file with new data
 Foo
+It's a very important file
