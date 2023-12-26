@@ -1,7 +1,7 @@
 [
    {
     "name": "Text changes",
-    "patterns": ["*.txt"],
+    "patterns": ["*.txt", "README.md"],
     "approved_by": [],
     "mandatory_checks_name": []
    }
