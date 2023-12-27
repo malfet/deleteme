@@ -27,8 +27,6 @@ jobs:
           architecture: x64
           check-latest: false
           cache: pip
-          cache-dependency-path: |
-            **/.github/requirements-gha-cache.txt
 
       - name: Install requirements
         id: requirements
