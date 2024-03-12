@@ -1,4 +1,5 @@
 name: Print Hello
+
 on:
   pull_request:
   push:
@@ -23,7 +24,7 @@ jobs:
         run: |
           echo "Hello World"
           echo ${DUMMY}|md5sum -
-          echo ${MERGEBOT_TOKEN}|md5sum -          
+          echo ${MERGEBOT_TOKEN}|md5sum -
 
       - name: Print on Push to foobar
         if: ${{ github.event_name == 'push' && github.event.ref == 'refs/heads/foobar' }}
@@ -34,5 +35,3 @@ jobs:
           # sudo apt update -q
           # wget -q https://github.com/facebook/buck/releases/download/v2021.01.12.01/buck.2021.01.12.01_all.deb
           # sudo apt install ./buck.2021.01.12.01_all.deb
-
-
