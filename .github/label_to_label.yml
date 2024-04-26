@@ -1,0 +1,9 @@
+- any:
+  - "testing label"
+  then:
+  - "testing label 2"
+- all:
+  - "testing label"
+  - "testing label 2"
+  then:
+  - "testing label 3"

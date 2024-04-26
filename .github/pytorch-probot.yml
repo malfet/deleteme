@@ -1,2 +1,2 @@
 tracking_issue: 33
-labeler_config: labeler.yml
+label_to_label_config: label_to_label.yml
