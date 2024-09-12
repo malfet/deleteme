@@ -1117,7 +1117,7 @@ class GitHubPR:
         msg = self.get_title() + f" (#{self.pr_num})\n\n"
         msg += msg_body
 
-        msg += f"\nPull Request resolved: {self.get_pr_url()}\n"
+        # msg += f"\nPull Request resolved: {self.get_pr_url()}\n"
         msg += f"Approved by: {approved_by_urls}\n"
         if ghstack_deps:
             msg += f"ghstack dependencies: {', '.join([f'#{pr.pr_num}' for pr in ghstack_deps])}\n"
