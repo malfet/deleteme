@@ -1177,7 +1177,7 @@ class GitHubPR:
 
         # When the merge process reaches this part, we can assume that the commit
         # has been successfully pushed to trunk
-        merge_commit_sha = repo.rev_parse(name=REMOTE_MAIN_BRANCH)
+        merge_commit_sha = repo.rev_parse(name=self.default_branch())
 
         if comment_id and self.pr_num:
             # Finally, upload the record to Rockset. The list of pending and failed
