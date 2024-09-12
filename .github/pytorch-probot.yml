@@ -1,2 +1,3 @@
 tracking_issue: 33
 label_to_label_config: label_to_label.yml
+mergebot: True
