@@ -35,7 +35,7 @@ jobs:
           FORCE: ${{ github.event.client_payload.force}}
           GH_RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
         run: |
-          if [ -n "${FORCE}"; then
+          if [ -n "${FORCE}" ]; then
             python3 .github/scripts/trymerge.py --force "${PR_NUM}"
           else
             python3 .github/scripts/trymerge.py "${PR_NUM}"
