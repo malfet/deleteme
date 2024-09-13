@@ -1,6 +1,7 @@
 name: Compile main
 
 on:
+  pull_request:
   push:
     branches:
       - hauptzweig
@@ -11,7 +12,7 @@ on:
 
 jobs:
   do_compile:
-    runs-on: macos-12
+    runs-on: macos-14
     # runs-on: self-hosted
     steps:
       - name: Checkout repo
