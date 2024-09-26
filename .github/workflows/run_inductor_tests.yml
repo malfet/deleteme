@@ -1,0 +1,35 @@
+name: Run Inductor Tests
+
+on:
+  pull_request:
+    paths:
+      - '.github/workflows/run_inductor_tests.yml'
+  pull_request_target:
+    types: [labeled]
+
+jobs:
+  run-inductor-tests:
+    if: |
+      (github.event.action == 'labeled' && github.event.label.name == 'inductor-test') ||
+      (github.event_name == 'pull_request' && contains(github.event.pull_request.changed_files, '.github/workflows/run_inductor_tests.yml'))
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout PyTorch
+        uses: actions/checkout@v3
+        with:
+          fetch-depth: 0
+
+      - name: Run Inductor Tests
+        uses: pytorch/pytorch-integration-tests/.github/workflows/inductor-tests@main
+        with:
+          workflow: inductor-tests.yml
+          pytorch-ref: ${{ github.event.pull_request.head.sha }}
+
+      - name: Upload test results
+        uses: actions/upload-artifact@v3
+        with:
+          name: inductor-test-results
+          path: test-results/
+        if: failure()
+
+
