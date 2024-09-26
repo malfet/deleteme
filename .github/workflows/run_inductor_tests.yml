@@ -9,9 +9,9 @@ on:
 
 jobs:
   run-inductor-tests:
-    if: |
-      (github.event.action == 'labeled' && github.event.label.name == 'inductor-test') ||
-      (github.event_name == 'pull_request' && contains(github.event.pull_request.changed_files, '.github/workflows/run_inductor_tests.yml'))
+    # if: |
+    #   (github.event.action == 'labeled' && github.event.label.name == 'inductor-test') ||
+    #   (github.event_name == 'pull_request' && contains(github.event.pull_request.changed_files, '.github/workflows/run_inductor_tests.yml'))
     runs-on: ubuntu-latest
     steps:
       - name: Checkout PyTorch
