@@ -20,7 +20,7 @@ jobs:
           fetch-depth: 0
 
       - name: Run Inductor Tests
-        uses: pytorch/pytorch-integration-tests/.github/actions/inductor-tests@main
+        uses: pytorch/pytorch-integration-testing/.github/actions/inductor-tests@main
         with:
           workflow: inductor-tests.yml
           pytorch-ref: ${{ github.event.pull_request.head.sha }}
