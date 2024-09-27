@@ -22,8 +22,8 @@ jobs:
       - name: Run Inductor Tests
         uses: pytorch/pytorch-integration-testing/.github/actions/inductor-test@master
         with:
-          workflow: inductor-tests.yml
-          pytorch-ref: ${{ github.event.pull_request.head.sha }}
+            triton_pin: main
+            pytorch_pin: main
 
       - name: Upload test results
         uses: actions/upload-artifact@v3
