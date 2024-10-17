@@ -25,5 +25,5 @@ jobs:
           clang++ -o hello hello.cpp
           file hello
           ./hello
-          clang++ -o query_metal query_metal.mm -framework Metal -framework Foundation -lobjc
+          clang++ -o query_metal query_metal.mm -framework Metal -framework Foundation -lobjc -std=c++17
           ./query_metal
