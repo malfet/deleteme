@@ -29,5 +29,5 @@ jobs:
           ./query_metal
       - name: Install PyTorch and run matmul on MPS
         run: |
-          pip install torch
+          pip install torch --pre --index-url https://download.pytorch.org/whl/nightly/cpu
           python -c "import torch;print(torch.rand(3, 3, device='mps'))"
