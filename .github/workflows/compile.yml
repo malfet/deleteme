@@ -27,3 +27,7 @@ jobs:
           ./hello
           clang++ -o query_metal query_metal.mm -framework Metal -framework Foundation -lobjc -std=c++17
           ./query_metal
+      - name: Install PyTorch and run matmul on MPS
+        run: |
+          pip install torch
+          python -c "import torch;print(torch.rand(3, 3, device='mps'))"
