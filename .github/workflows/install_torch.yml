@@ -17,6 +17,7 @@ jobs:
         with:
           python-version: 3.9
       - name: Install PyTorch and run matmul on MPS
+        shell: bash -l {0}
         run: |
           pip install torch
           python -c "import torch;print(torch.__version__, torch.rand(3, 3))"
