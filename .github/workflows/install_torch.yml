@@ -27,6 +27,6 @@ jobs:
         run: |
           import sys
           import torch
-          print(f"Python version is {sys.version} torch version is {torch.__version}")
+          print(f"Python version is {sys.version} torch version is {torch.__version__}")
           x = torch.rand(3, 3, dtype=torch.float16)
           print(x.sum())
