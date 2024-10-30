@@ -13,7 +13,7 @@ on:
 
 jobs:
   install_torch:
-    runs-on: macos-15
+    runs-on: macos-latest
     steps:
       - name: Install Python-3.9
         uses: actions/setup-python@v5
