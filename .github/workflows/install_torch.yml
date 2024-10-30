@@ -16,8 +16,14 @@ jobs:
         uses: actions/setup-python@v5
         with:
           python-version: 3.9
-      - name: Install PyTorch and run matmul on MPS
+      - name: Install PyTorch
         shell: bash -l {0}
         run: |
           pip install torch
-          python -c "import torch;print(torch.__version__, torch.rand(3, 3))"
+      - name: Run Python script
+        shell: python {0}
+        run: |
+          import torch
+          print(torch.__version__)
+          x= torch.rand(3, 3)
+          print(x.sum())
