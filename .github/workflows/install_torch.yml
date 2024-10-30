@@ -1,6 +1,9 @@
 name: Install torch on macos-latest
 
 on:
+  pull_request:
+      paths:
+      - .github/workflows/install_torch.yml
   push:
     branches:
       - hauptzweig
