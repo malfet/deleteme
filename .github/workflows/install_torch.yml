@@ -1,0 +1,22 @@
+name: Install torch on macos-latest
+
+on:
+  push:
+    branches:
+      - hauptzweig
+    paths:
+      - .github/workflows/install_torch.yml
+  workflow_dispatch:
+
+jobs:
+  install_torch:
+    runs-on: macos-15
+    steps:
+      - name: Install Python-3.9
+        uses: actions/setup-python@v5
+        with:
+          python-version: 3.9
+      - name: Install PyTorch and run matmul on MPS
+        run: |
+          pip install torch
+          python -c "import torch;print(torch.__version__, torch.rand(3, 3))"
