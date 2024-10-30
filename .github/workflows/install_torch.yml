@@ -1,6 +1,9 @@
 name: Install torch on macos-latest
 
 on:
+  pull_request:
+      paths:
+      - .github/workflows/install_torch.yml
   push:
     branches:
       - hauptzweig
@@ -12,12 +15,21 @@ jobs:
   install_torch:
     runs-on: macos-15
     steps:
-      - name: Install Python-3.9
+      - name: Install Python-3.10
         uses: actions/setup-python@v5
         with:
-          python-version: 3.9
-      - name: Install PyTorch and run matmul on MPS
+          python-version: "3.10"
+      - name: Print some system info
         shell: bash -l {0}
+        run:  sw_vers; python --version; arch
+      - name: Install PyTorch and Numpy
+        shell: bash -l {0}
+        run:  pip install torch numpy
+      - name: Run Python script
+        shell: python {0}
         run: |
-          pip install torch
-          python -c "import torch;print(torch.__version__, torch.rand(3, 3))"
+          import sys
+          import torch
+          print(f"Python version is {sys.version} torch version is {torch.__version__}")
+          x = torch.rand(3, 3, dtype=torch.float16)
+          print(x.sum())
