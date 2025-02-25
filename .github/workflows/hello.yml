@@ -27,12 +27,22 @@ jobs:
 
       - name: Print on Push to foobar
         if: ${{ github.event_name == 'push' && github.event.ref == 'refs/heads/foobar' }}
-        run: echo "Hello on push ${{ github.event.ref }}"
-
-      - name: Install buck
-        run: |
-          # sudo apt update -q
-          # wget -q https://github.com/facebook/buck/releases/download/v2021.01.12.01/buck.2021.01.12.01_all.deb
-          # sudo apt install ./buck.2021.01.12.01_all.deb
-
-
+        run: echo "Hello on push ${{ github.event.ref }}"        
+  oidc_debug_test:
+    permissions:
+      contents: read
+      id-token: write
+    runs-on: ubuntu-latest
+    name: A test of the oidc debugger
+    steps:
+      - name: Checkout actions-oidc-debugger
+        uses: actions/checkout@v3
+        with:
+          repository: github/actions-oidc-debugger
+          ref: main
+          token: ${{ secrets.your-checkout-token }}
+          path: ./.github/actions/actions-oidc-debugger
+      - name: Debug OIDC Claims
+        uses: ./.github/actions/actions-oidc-debugger
+        with:
+          audience: '${{ github.server_url }}/${{ github.repository_owner }}'
