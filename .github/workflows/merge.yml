@@ -6,7 +6,7 @@ on:
 
 jobs:
   do_merge:
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-24.04
     environment: mergebot
     steps:
       - name: Checkout repo
