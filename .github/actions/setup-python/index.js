@@ -15,8 +15,8 @@ function run() {
     const formula = `python@${pythonVersion}`;
 
     execSync(`brew install ${formula}`, {stdio: 'inherit'});
-    const prefix = execSync(`brew --prefix ${formula}`, {encoding: 'utf8'}).trim();
-    const pythonBin = path.join(prefix, 'bin', 'python3');
+    const prefix = execSync(`brew --prefix`, {encoding: 'utf8'}).trim();
+    const pythonBin = path.join(prefix, 'bin', `python${pythonVersion}`);
 
     console.log(`Using python at ${pythonBin}`);
     execSync(`"${pythonBin}" -m venv "${venvPath}"`, {stdio: 'inherit'});
