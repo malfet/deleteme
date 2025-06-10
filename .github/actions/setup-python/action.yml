@@ -1,0 +1,15 @@
+name: 'Setup Python via Homebrew'
+description: 'Installs Python using Homebrew on macOS and creates a virtual environment.'
+inputs:
+  python-version:
+    description: 'Python version to install (Homebrew formula suffix). Example: 3.11'
+    required: false
+    default: '3.11'
+  venv-path:
+    description: 'Path to create the virtual environment in.'
+    required: false
+    default: '.venv'
+runs:
+  using: 'node20'
+  main: 'index.js'
+  post: 'cleanup.js'

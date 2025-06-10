@@ -1,0 +1,20 @@
+name: Example Setup Python
+
+on:
+  workflow_dispatch:
+
+jobs:
+  setup-python-job:
+    runs-on: macos-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v3
+      - name: Setup Python
+        uses: ./.github/actions/setup-python
+        with:
+          python-version: '3.11'
+          venv-path: '.venv'
+      - name: Show Python version
+        run: python3 --version
+      - name: List pip
+        run: pip3 --version
