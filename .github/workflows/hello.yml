@@ -46,4 +46,4 @@ jobs:
         run: |
           set -ex
           cd .github/scripts
-          python3 -c "from trymerge import GitHubPR; print(GitHubPR("pytorch, "pytorch", 159820))"
+          python3 -c "from trymerge import GitHubPR; print(GitHubPR('pytorch', 'pytorch', 159820))"
