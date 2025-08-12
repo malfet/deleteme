@@ -28,6 +28,9 @@ jobs:
       - name: Print on Push to foobar
         if: ${{ github.event_name == 'push' && github.event.ref == 'refs/heads/foobar' }}
         run: echo "Hello on push ${{ github.event.ref }}"
+
+      - name: Checkout repo
+        uses: actions/checkout@v5
   
       - name: Setup Python
         uses: actions/setup-python@v4
