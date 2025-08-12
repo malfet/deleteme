@@ -27,4 +27,20 @@ jobs:
 
       - name: Print on Push to foobar
         if: ${{ github.event_name == 'push' && github.event.ref == 'refs/heads/foobar' }}
-        run: echo "Hello on push ${{ github.event.ref }}"        
+        run: echo "Hello on push ${{ github.event.ref }}"
+  
+      - name: Setup Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: 3.10
+          architecture: x64
+          cache: 'pip'
+      - run: pip install pyyaml
+
+      - name: Run GQL query
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -ex
+          cd .github/scripts
+          python3 -c "from trymerge import GitHubPR; print(GitHubPR("pytorch, "pytorch", 159820))"
