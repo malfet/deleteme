@@ -22,7 +22,8 @@ jobs:
       - name: Install Python-3.10
         uses: actions/setup-python@v5
         with:
-          python-version: "3.14.0t-rc.2"
+          python-version: "3.14.0-rc.2"
+          freethreaded: true
       - name: Print Python version
         shell: bash {0}
         run:  python --version
