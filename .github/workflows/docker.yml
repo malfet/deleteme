@@ -1,0 +1,18 @@
+name: Docker Info
+
+on:
+  push:
+    branches: [ hauptzweig ]
+  pull_request:
+    branches: [ hauptzweig ]
+  workflow_dispatch:
+
+jobs:
+  docker-info:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Run docker info
+        run: docker info
