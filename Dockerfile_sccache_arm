@@ -50,10 +50,15 @@ RUN apt-get update && apt-get install -y \
     && chmod a+x /opt/cache/bin/sccache \
     && cd / \
     && rm -rf /sccache /root/.cargo /root/.rustup \
-    && apt-get remove -y pkg-config libssl-dev curl git \
+    && apt-get remove -y pkg-config libssl-dev curl \
     && apt-get autoremove -y \
     && apt-get autoclean && apt-get clean \
     && rm -rf /var/lib/apt/lists/*
 
 # Add sccache to PATH
 ENV PATH="/opt/cache/bin:${PATH}"
+
+# Create Python 3.12 venv
+RUN python3.12 -m venv /root/py3.12-local
+
+WORKDIR /root
