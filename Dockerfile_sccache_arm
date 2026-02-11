@@ -1,0 +1,59 @@
+FROM ubuntu:24.04
+
+ENV DEBIAN_FRONTEND=noninteractive
+
+# Install runtime packages
+RUN apt-get update && apt-get install -y \
+    python3.12-venv \
+    python3.12-dev \
+    g++ \
+    && rm -rf /var/lib/apt/lists/*
+
+# Install CUDA 13.0.2 toolkit via runfile installer (ARM/sbsa)
+RUN apt-get update && apt-get install -y wget \
+    && wget -q https://developer.download.nvidia.com/compute/cuda/13.0.2/local_installers/cuda_13.0.2_580.95.05_linux_sbsa.run -O cuda.run \
+    && chmod +x cuda.run \
+    && ./cuda.run --toolkit --silent \
+    && rm -f cuda.run \
+    && ln -s /usr/local/cuda-13.0 /usr/local/cuda \
+    && apt-get remove -y wget \
+    && apt-get autoremove -y \
+    && rm -rf /var/lib/apt/lists/*
+
+# Install cuDNN 9.17.1.4 for CUDA 13
+RUN apt-get update && apt-get install -y wget \
+    && mkdir /tmp/cudnn && cd /tmp/cudnn \
+    && wget -q https://developer.download.nvidia.com/compute/cudnn/redist/cudnn/linux-sbsa/cudnn-linux-sbsa-9.17.1.4_cuda13-archive.tar.xz \
+    && tar xf cudnn-linux-sbsa-9.17.1.4_cuda13-archive.tar.xz \
+    && cp -a cudnn-linux-sbsa-9.17.1.4_cuda13-archive/include/* /usr/local/cuda/include/ \
+    && cp -a cudnn-linux-sbsa-9.17.1.4_cuda13-archive/lib/* /usr/local/cuda/lib64/ \
+    && cd / && rm -rf /tmp/cudnn \
+    && apt-get remove -y wget \
+    && apt-get autoremove -y \
+    && rm -rf /var/lib/apt/lists/* \
+    && ldconfig
+
+ENV PATH="/usr/local/cuda/bin:${PATH}"
+ENV LD_LIBRARY_PATH="/usr/local/cuda/lib64:${LD_LIBRARY_PATH}"
+
+# Build sccache from source with distributed features
+RUN apt-get update && apt-get install -y \
+    pkg-config libssl-dev curl git \
+    && curl https://sh.rustup.rs -sSf | sh -s -- -y \
+    && mkdir -p /opt/cache/bin \
+    && git clone https://github.com/mozilla/sccache -b v0.13.0 \
+    && cd sccache \
+    && sed -i '/all(target_os = "linux", target_arch = "x86_64"),/{ p; s/x86_64/aarch64/; }' src/bin/sccache-dist/main.rs \
+    && . "$HOME/.cargo/env" && cargo build --release --features="dist-client dist-server" \
+    && cp target/release/sccache /opt/cache/bin/ \
+    && cp target/release/sccache-dist /opt/cache/bin/ \
+    && chmod a+x /opt/cache/bin/sccache \
+    && cd / \
+    && rm -rf /sccache /root/.cargo /root/.rustup \
+    && apt-get remove -y pkg-config libssl-dev curl git \
+    && apt-get autoremove -y \
+    && apt-get autoclean && apt-get clean \
+    && rm -rf /var/lib/apt/lists/*
+
+# Add sccache to PATH
+ENV PATH="/opt/cache/bin:${PATH}"
