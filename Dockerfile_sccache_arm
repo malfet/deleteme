@@ -10,31 +10,31 @@ RUN apt-get update && apt-get install -y \
     && rm -rf /var/lib/apt/lists/*
 
 # Install CUDA 13.0.2 toolkit via runfile installer (ARM/sbsa)
-RUN apt-get update && apt-get install -y wget \
-    && wget -q https://developer.download.nvidia.com/compute/cuda/13.0.2/local_installers/cuda_13.0.2_580.95.05_linux_sbsa.run -O cuda.run \
-    && chmod +x cuda.run \
-    && ./cuda.run --toolkit --silent \
-    && rm -f cuda.run \
-    && ln -s /usr/local/cuda-13.0 /usr/local/cuda \
-    && apt-get remove -y wget \
-    && apt-get autoremove -y \
-    && rm -rf /var/lib/apt/lists/*
+# RUN apt-get update && apt-get install -y wget \
+#     && wget -q https://developer.download.nvidia.com/compute/cuda/13.0.2/local_installers/cuda_13.0.2_580.95.05_linux_sbsa.run -O cuda.run \
+#     && chmod +x cuda.run \
+#     && ./cuda.run --toolkit --silent \
+#     && rm -f cuda.run \
+#     && ln -s /usr/local/cuda-13.0 /usr/local/cuda \
+#     && apt-get remove -y wget \
+#     && apt-get autoremove -y \
+#     && rm -rf /var/lib/apt/lists/*
 
 # Install cuDNN 9.17.1.4 for CUDA 13
-RUN apt-get update && apt-get install -y wget \
-    && mkdir /tmp/cudnn && cd /tmp/cudnn \
-    && wget -q https://developer.download.nvidia.com/compute/cudnn/redist/cudnn/linux-sbsa/cudnn-linux-sbsa-9.17.1.4_cuda13-archive.tar.xz \
-    && tar xf cudnn-linux-sbsa-9.17.1.4_cuda13-archive.tar.xz \
-    && cp -a cudnn-linux-sbsa-9.17.1.4_cuda13-archive/include/* /usr/local/cuda/include/ \
-    && cp -a cudnn-linux-sbsa-9.17.1.4_cuda13-archive/lib/* /usr/local/cuda/lib64/ \
-    && cd / && rm -rf /tmp/cudnn \
-    && apt-get remove -y wget \
-    && apt-get autoremove -y \
-    && rm -rf /var/lib/apt/lists/* \
-    && ldconfig
+# RUN apt-get update && apt-get install -y wget \
+#     && mkdir /tmp/cudnn && cd /tmp/cudnn \
+#     && wget -q https://developer.download.nvidia.com/compute/cudnn/redist/cudnn/linux-sbsa/cudnn-linux-sbsa-9.17.1.4_cuda13-archive.tar.xz \
+#     && tar xf cudnn-linux-sbsa-9.17.1.4_cuda13-archive.tar.xz \
+#     && cp -a cudnn-linux-sbsa-9.17.1.4_cuda13-archive/include/* /usr/local/cuda/include/ \
+#     && cp -a cudnn-linux-sbsa-9.17.1.4_cuda13-archive/lib/* /usr/local/cuda/lib64/ \
+#     && cd / && rm -rf /tmp/cudnn \
+#     && apt-get remove -y wget \
+#     && apt-get autoremove -y \
+#     && rm -rf /var/lib/apt/lists/* \
+#     && ldconfig
 
-ENV PATH="/usr/local/cuda/bin:${PATH}"
-ENV LD_LIBRARY_PATH="/usr/local/cuda/lib64:${LD_LIBRARY_PATH}"
+# ENV PATH="/usr/local/cuda/bin:${PATH}"
+# ENV LD_LIBRARY_PATH="/usr/local/cuda/lib64:${LD_LIBRARY_PATH}"
 
 # Build sccache from source with distributed features
 RUN apt-get update && apt-get install -y \
