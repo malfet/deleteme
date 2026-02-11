@@ -60,13 +60,32 @@ def ec2_instances_by_id(instance_id):
 def start_instance(
     key_name, ami=ubuntu20_04_ami, instance_type="t4g.2xlarge", ebs_size: int = 50
 ):
-    inst = ec2.create_instances(
+    instances = start_instances(
+        key_name, count=1, ami=ami, instance_type=instance_type, ebs_size=ebs_size
+    )
+    return instances[0]
+
+
+def start_instances(
+    key_name,
+    count: int = 1,
+    ami=ubuntu20_04_ami,
+    instance_type="t4g.2xlarge",
+    ebs_size: int = 50,
+) -> list:
+    """Launch one or more EC2 instances.
+
+    All instances share the ssh-allworld security group. To allow inter-node
+    communication, run allow_cluster_traffic.py to add a self-referencing rule
+    to that group.
+    """
+    instances = ec2.create_instances(
         ImageId=ami,
         InstanceType=instance_type,
         SecurityGroups=["ssh-allworld"],
         KeyName=key_name,
-        MinCount=1,
-        MaxCount=1,
+        MinCount=count,
+        MaxCount=count,
         BlockDeviceMappings=[
             {
                 "DeviceName": "/dev/sda1",
@@ -77,12 +96,21 @@ def start_instance(
                 },
             }
         ],
-    )[0]
-    print(f"Create instance {inst.id}")
-    inst.wait_until_running()
-    running_inst = ec2_instances_by_id(inst.id)
-    print(f"Instance started at {running_inst.public_dns_name}")
-    return running_inst
+    )
+    for inst in instances:
+        print(f"Created instance {inst.id}")
+
+    for inst in instances:
+        inst.wait_until_running()
+
+    running = [ec2_instances_by_id(inst.id) for inst in instances]
+    for inst in running:
+        print(
+            f"Instance {inst.id} running at {inst.public_dns_name}"
+            f" (private: {inst.private_ip_address})"
+        )
+
+    return running
 
 
 class RemoteHost:
@@ -263,6 +291,30 @@ def update_apt_repo(host: RemoteHost) -> None:
     host.run_cmd("sudo apt-get update")
 
 
+def configure_cluster_hosts(hosts: list["RemoteHost"], instances: list) -> None:
+    """Set up /etc/hosts and env vars so cluster nodes can find each other.
+
+    Each node gets:
+    - /etc/hosts entries mapping node0, node1, ... to private IPs
+    - NODE_RANK, WORLD_SIZE, MASTER_ADDR, MASTER_PORT env vars
+    """
+    for i, host in enumerate(hosts):
+        for j, inst in enumerate(instances):
+            host.run_ssh_cmd(
+                f"echo {inst.private_ip_address} node{j} | sudo tee -a /etc/hosts"
+            )
+        host.run_ssh_cmd(f"echo export NODE_RANK={i} >> ~/.bashrc")
+        host.run_ssh_cmd(
+            f"echo export WORLD_SIZE={len(hosts)} >> ~/.bashrc"
+        )
+        host.run_ssh_cmd("echo export MASTER_ADDR=node0 >> ~/.bashrc")
+        host.run_ssh_cmd("echo export MASTER_PORT=29500 >> ~/.bashrc")
+    print(
+        f"Cluster configured: {len(hosts)} nodes, "
+        f"master at {instances[0].private_ip_address}"
+    )
+
+
 def install_condaforge(
     host: RemoteHost, suffix: str = "latest/download/Miniforge3-Linux-aarch64.sh"
 ) -> None:
@@ -408,6 +460,8 @@ def parse_arguments():
         default=None,
     )
     parser.add_argument("--alloc-instance", action="store_true")
+    parser.add_argument("--num-instances", type=int, default=1,
+                        help="Number of instances to launch (default: 1)")
     parser.add_argument("--list-instances", action="store_true")
     parser.add_argument("--pytorch-only", action="store_true")
     parser.add_argument("--keep-running", action="store_true")
@@ -456,32 +510,47 @@ if __name__ == "__main__":
             Cannot find keyfile with name: [{key_name}] in path: [{keyfile_path}], please
             check `~/.ssh/` folder or manually set SSH_KEY_PATH environment variable.""")
 
-    # Starting the instance
-    inst = start_instance(
-        key_name, ami=ami, instance_type=args.instance_type, ebs_size=args.ebs_size
+    # Starting the instance(s)
+    instances = start_instances(
+        key_name,
+        count=args.num_instances,
+        ami=ami,
+        instance_type=args.instance_type,
+        ebs_size=args.ebs_size,
     )
     instance_name = f"{args.key_name}-{args.os}"
     if args.python_version is not None:
         instance_name += f"-py{args.python_version}"
-    inst.create_tags(
-        DryRun=False,
-        Tags=[
-            {
-                "Key": "Name",
-                "Value": instance_name,
-            }
-        ],
-    )
-    addr = inst.public_dns_name
-    wait_for_connection(addr, 22)
-    host = RemoteHost(addr, keyfile_path)
-    host.ami = ami
+    for i, inst in enumerate(instances):
+        node_suffix = f"-node{i}" if len(instances) > 1 else ""
+        inst.create_tags(
+            DryRun=False,
+            Tags=[
+                {
+                    "Key": "Name",
+                    "Value": f"{instance_name}{node_suffix}",
+                }
+            ],
+        )
+
+    hosts = []
+    for inst in instances:
+        wait_for_connection(inst.public_dns_name, 22)
+        host = RemoteHost(inst.public_dns_name, keyfile_path)
+        host.ami = ami
+        hosts.append(host)
+
     if args.use_docker:
-        update_apt_repo(host)
-        host.start_docker()
+        for host in hosts:
+            update_apt_repo(host)
+            host.start_docker()
+
+    if len(instances) > 1:
+        configure_cluster_hosts(hosts, instances)
 
     if args.alloc_instance:
         if args.python_version is None:
             sys.exit(0)
-        install_condaforge_python(host, args.python_version)
+        for host in hosts:
+            install_condaforge_python(host, args.python_version)
         sys.exit(0)
