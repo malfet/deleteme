@@ -21,10 +21,11 @@ import boto3
 os_amis = {
     "ubuntu20_04": "ami-052eac90edaa9d08f",  # login_name: ubuntu
     "ubuntu22_04": "ami-0c6c29c5125214c77",  # login_name: ubuntu
+    "ubuntu24_04": "ami-0071c8c431eea0edb",  # login_name: ubuntu
     "redhat8": "ami-0698b90665a2ddcf1",  # login_name: ec2-user
 }
 
-ubuntu20_04_ami = os_amis["ubuntu20_04"]
+ubuntu20_04_ami = os_amis["ubuntu24_04"]
 
 
 def compute_keyfile_path(key_name: Optional[str] = None) -> tuple[str, str]:
