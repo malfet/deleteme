@@ -174,10 +174,13 @@ class RemoteHost:
             ]
         )
 
-    def start_docker(self, image="quay.io/pypa/manylinux2014_aarch64:latest") -> None:
+    def install_docker_runtime(self) -> None:
         self.run_ssh_cmd("sudo apt-get install -y docker.io")
         self.run_ssh_cmd(f"sudo usermod -a -G docker {self.login_name}")
         self.run_ssh_cmd("sudo service docker start")
+
+    def start_docker(self, image="quay.io/pypa/manylinux2014_aarch64:latest") -> None:
+        self.install_docker_runtime()
         self.run_ssh_cmd(f"docker pull {image}")
         self.container_id = self.check_ssh_output(
             f"docker run -t -d -w /root {image}"
@@ -549,6 +552,10 @@ if __name__ == "__main__":
         configure_cluster_hosts(hosts, instances)
 
     if args.alloc_instance:
+        for host in hosts:
+            if not args.use_docker:
+                update_apt_repo(host)
+                host.install_docker_runtime()
         if args.python_version is None:
             sys.exit(0)
         for host in hosts:
