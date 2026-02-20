@@ -26,7 +26,7 @@ os_amis = {
 }
 
 default_ubuntu_ami = os_amis["ubuntu24_04"]
-default_instance_type="m7g.4xlarge"
+default_instance_type="m8g.2xlarge"
 
 
 def compute_keyfile_path(key_name: Optional[str] = None) -> tuple[str, str]:
@@ -470,7 +470,7 @@ def parse_arguments():
     parser.add_argument("--pytorch-only", action="store_true")
     parser.add_argument("--keep-running", action="store_true")
     parser.add_argument("--terminate-instances", action="store_true")
-    parser.add_argument("--instance-type", type=str, default=default_isntance_type)
+    parser.add_argument("--instance-type", type=str, default=default_instance_type)
     parser.add_argument("--ebs-size", type=int, default=50)
     parser.add_argument("--branch", type=str, default="main")
     parser.add_argument("--use-docker", action="store_true")
