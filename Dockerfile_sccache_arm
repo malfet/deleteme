@@ -43,8 +43,8 @@ RUN apt-get update && apt-get install -y \
     && mkdir -p /opt/cache/bin \
     && git clone https://github.com/mozilla/sccache -b v0.13.0 \
     && cd sccache \
-    && sed -i '/all(target_os = "linux", target_arch = "x86_64"),/{ p; s/x86_64/aarch64/; }' src/bin/sccache-dist/main.rs \
-    && sed -i 's/target_arch = "x86_64"/any(target_arch = "x86_64", target_arch = "aarch64")/g' src/dist/pkg.rs \
+    && sed -i '/all(target_os = "linux", target_arch = "x86_64"),/{ p; s/x86_64/aarch64/; }' src/bin/sccache-dist/main.rs src/compiler/compiler.rs \
+    && sed -i 's/target_arch = "x86_64"/any(target_arch = "x86_64", target_arch = "aarch64")/g' src/dist/pkg.rs src/compiler/c.rs src/compiler/rust.rs \
     && . "$HOME/.cargo/env" && cargo build --release --features="dist-client dist-server" \
     && cp target/release/sccache /opt/cache/bin/ \
     && cp target/release/sccache-dist /opt/cache/bin/ \
