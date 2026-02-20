@@ -25,7 +25,8 @@ os_amis = {
     "redhat8": "ami-0698b90665a2ddcf1",  # login_name: ec2-user
 }
 
-ubuntu20_04_ami = os_amis["ubuntu24_04"]
+default_ubuntu_ami = os_amis["ubuntu24_04"]
+default_instance_type="m7g.4xlarge"
 
 
 def compute_keyfile_path(key_name: Optional[str] = None) -> tuple[str, str]:
@@ -48,7 +49,7 @@ def ec2_get_instances(filter_name, filter_value):
     )
 
 
-def ec2_instances_of_type(instance_type="t4g.2xlarge"):
+def ec2_instances_of_type(instance_type=default_instance_type):
     return ec2_get_instances("instance-type", instance_type)
 
 
@@ -58,7 +59,7 @@ def ec2_instances_by_id(instance_id):
 
 
 def start_instance(
-    key_name, ami=ubuntu20_04_ami, instance_type="t4g.2xlarge", ebs_size: int = 50
+    key_name, ami=default_ubuntu_ami, instance_type=default_instance_type, ebs_size: int = 50
 ):
     instances = start_instances(
         key_name, count=1, ami=ami, instance_type=instance_type, ebs_size=ebs_size
@@ -69,8 +70,8 @@ def start_instance(
 def start_instances(
     key_name,
     count: int = 1,
-    ami=ubuntu20_04_ami,
-    instance_type="t4g.2xlarge",
+    ami=default_ubuntu_ami,
+    instance_type=default_instance_type,
     ebs_size: int = 50,
 ) -> list:
     """Launch one or more EC2 instances.
@@ -469,7 +470,7 @@ def parse_arguments():
     parser.add_argument("--pytorch-only", action="store_true")
     parser.add_argument("--keep-running", action="store_true")
     parser.add_argument("--terminate-instances", action="store_true")
-    parser.add_argument("--instance-type", type=str, default="t4g.2xlarge")
+    parser.add_argument("--instance-type", type=str, default=default_isntance_type)
     parser.add_argument("--ebs-size", type=int, default=50)
     parser.add_argument("--branch", type=str, default="main")
     parser.add_argument("--use-docker", action="store_true")
@@ -492,7 +493,7 @@ if __name__ == "__main__":
         if args.ami is not None
         else os_amis[args.os]
         if args.os is not None
-        else ubuntu20_04_ami
+        else default_ubuntu_ami
     )
     keyfile_path, key_name = compute_keyfile_path(args.key_name)
 
