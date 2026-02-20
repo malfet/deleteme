@@ -557,8 +557,14 @@ if __name__ == "__main__":
             if not args.use_docker:
                 update_apt_repo(host)
                 host.install_docker_runtime()
-        if args.python_version is None:
-            sys.exit(0)
-        for host in hosts:
-            install_condaforge_python(host, args.python_version)
+        if args.python_version is not None:
+            for host in hosts:
+                install_condaforge_python(host, args.python_version)
+        if len(instances) > 1:
+            print(f"\n--- Cluster Summary ({len(instances)} instances) ---")
+            for i, inst in enumerate(instances):
+                print(
+                    f"  node-{i}: {inst.public_dns_name}"
+                    f" (private: {inst.private_ip_address})"
+                )
         sys.exit(0)
