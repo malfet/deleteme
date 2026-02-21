@@ -552,19 +552,119 @@ if __name__ == "__main__":
     if len(instances) > 1:
         configure_cluster_hosts(hosts, instances)
 
-    if args.alloc_instance:
+    for host in hosts:
+        if not args.use_docker:
+            update_apt_repo(host)
+            host.install_docker_runtime()
+    print("Installing sccache from container image")
+    sccache_image = "ghcr.io/malfet/deleteme/sccache-arm:latest"
+    for host in hosts:
+        host.run_ssh_cmd(f"sudo docker pull {sccache_image}")
+        host.run_ssh_cmd(
+            f"sudo docker run --rm -v /usr/local/bin:/out {sccache_image}"
+            " cp /opt/cache/bin/sccache /opt/cache/bin/sccache-dist /out/"
+        )
+    if len(instances) > 1:
+        scheduler_ip = instances[0].private_ip_address
+        scheduler_conf = (
+            '# The socket address the scheduler will listen on. It\'s strongly recommended\n'
+            '# to listen on localhost and put a HTTPS server in front of it.\n'
+            f'public_addr = "{scheduler_ip}:10600"\n'
+            '\n'
+            '[client_auth]\n'
+            'type = "DANGEROUSLY_INSECURE"\n'
+            '\n'
+            '[server_auth]\n'
+            'type = "token"\n'
+            'token = "THIS IS THE TEST TOKEN"\n'
+        )
+        hosts[0].run_ssh_cmd(
+            ["bash", "-c", f"cat > ~/scheduler.conf << 'SCCACHE_EOF'\n{scheduler_conf}SCCACHE_EOF"]
+        )
+        print("  Created scheduler.conf on node-0")
+        client_conf = (
+            '[dist]\n'
+            f'scheduler_url = "http://{scheduler_ip}:10600"\n'
+            '\n'
+            '[dist.auth]\n'
+            'type = "token"\n'
+            'token = "dangerously_insecure_client"\n'
+        )
+        hosts[0].run_ssh_cmd("mkdir -p ~/.config/sccache")
+        hosts[0].run_ssh_cmd(
+            ["bash", "-c", f"cat > ~/.config/sccache/config << 'SCCACHE_EOF'\n{client_conf}SCCACHE_EOF"]
+        )
+        print("  Created .config/sccache/config on node-0")
+        for i, inst in enumerate(instances[1:], start=1):
+            server_conf = (
+                '# This is where client toolchains will be stored.\n'
+                'cache_dir = "/tmp/toolchains"\n'
+                '# The maximum size of the toolchain cache, in bytes.\n'
+                '# If unspecified the default is 10GB.\n'
+                '# toolchain_cache_size = 10737418240\n'
+                '# A public IP address and port that clients will use to connect to this builder.\n'
+                f'public_addr = "{inst.private_ip_address}:10501"\n'
+                '# The URL used to connect to the scheduler (should use https, given an ideal\n'
+                '# setup of a HTTPS server in front of the scheduler)\n'
+                f'scheduler_url = "http://{scheduler_ip}:10600"\n'
+                '\n'
+                '[builder]\n'
+                'type = "overlay"\n'
+                '# The directory under which a sandboxed filesystem will be created for builds.\n'
+                'build_dir = "/tmp/build"\n'
+                '# The path to the bubblewrap version 0.3.0+ `bwrap` binary.\n'
+                'bwrap_path = "/usr/bin/bwrap"\n'
+                '\n'
+                '[scheduler_auth]\n'
+                'type = "token"\n'
+                'token = "THIS IS THE TEST TOKEN"\n'
+            )
+            hosts[i].run_ssh_cmd(
+                ["bash", "-c", f"cat > ~/server.conf << 'SCCACHE_EOF'\n{server_conf}SCCACHE_EOF"]
+            )
+            print(f"  Created server.conf on node-{i}")
+            hosts[i].run_ssh_cmd("sudo apt-get install -y bubblewrap")
+        hosts[0].run_ssh_cmd(
+            "sudo apt-get install -y vim git python3-venv python3-dev g++"
+        )
+        hosts[0].run_ssh_cmd(
+            "nohup sccache-dist scheduler --config ~/scheduler.conf"
+            " > ~/scheduler.log 2>&1 &"
+        )
+        print("  Started sccache-dist scheduler on node-0")
+        for i in range(1, len(instances)):
+            hosts[i].run_ssh_cmd(
+                "nohup sudo sccache-dist server --config ~/server.conf"
+                " > ~/server.log 2>&1 &"
+            )
+            print(f"  Started sccache-dist server on node-{i}")
+    if args.python_version is not None:
         for host in hosts:
-            if not args.use_docker:
-                update_apt_repo(host)
-                host.install_docker_runtime()
-        if args.python_version is not None:
-            for host in hosts:
-                install_condaforge_python(host, args.python_version)
-        if len(instances) > 1:
-            print(f"\n--- Cluster Summary ({len(instances)} instances) ---")
-            for i, inst in enumerate(instances):
-                print(
-                    f"  node-{i}: {inst.public_dns_name}"
-                    f" (private: {inst.private_ip_address})"
-                )
+            install_condaforge_python(host, args.python_version)
+    if len(instances) > 1:
+        print(f"\n--- Cluster Summary ({len(instances)} instances) ---")
+        for i, inst in enumerate(instances):
+            print(
+                f"  node-{i}: {inst.public_dns_name}"
+                f" (private: {inst.private_ip_address})"
+            )
+
+    if args.alloc_instance:
         sys.exit(0)
+
+    # Build PyTorch on node-0
+    host = hosts[0]
+    print("Checking out pytorch/pytorch")
+    host.run_ssh_cmd(f"git clone --depth 1 --recurse-submodules https://github.com/pytorch/pytorch -b {args.branch}")
+    print("Setting up Python venv and installing requirements")
+    host.run_ssh_cmd("python3 -m venv ~/py3.12-build")
+    host.run_ssh_cmd(
+        "bash -c 'source ~/py3.12-build/bin/activate && pip install -r ~/pytorch/requirements.txt'"
+    )
+    nproc = host.check_ssh_output("nproc").strip()
+    max_jobs = int(nproc) * len(instances)
+    print(f"Starting PyTorch build with MAX_JOBS={max_jobs}")
+    host.run_ssh_cmd(
+        f"bash -c 'cd ~/pytorch && source ~/py3.12-build/bin/activate"
+        f" && MAX_JOBS={max_jobs} python setup.py bdist_wheel'"
+    )
