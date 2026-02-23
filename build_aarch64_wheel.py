@@ -540,6 +540,93 @@ def provision_node(
     print(f"{prefix} Provisioning complete")
 
 
+def setup_nodes(
+    *,
+    key_name: str,
+    keyfile_path: str,
+    instance_name: str,
+    num_instances: int = 1,
+    ami: str = default_ubuntu_ami,
+    instance_type: str = default_instance_type,
+    ebs_size: int = 50,
+    use_docker: bool = False,
+    python_version: Optional[str] = None,
+) -> tuple[list[RemoteHost], list]:
+    """Launch EC2 instances, configure networking, install sccache, and
+    set up distributed compilation.
+
+    Returns (hosts, instances) ready for use.
+    """
+    sccache_image = "ghcr.io/malfet/deleteme/sccache-arm:latest"
+
+    # Launch instances
+    instances = start_instances(
+        key_name, count=num_instances, ami=ami,
+        instance_type=instance_type, ebs_size=ebs_size,
+    )
+
+    # Tag instances
+    for i, inst in enumerate(instances):
+        node_suffix = f"-node{i}" if len(instances) > 1 else ""
+        inst.create_tags(
+            DryRun=False,
+            Tags=[{"Key": "Name", "Value": f"{instance_name}{node_suffix}"}],
+        )
+
+    # Wait for SSH and create RemoteHost objects
+    hosts = []
+    for inst in instances:
+        wait_for_connection(inst.public_dns_name, 22)
+        host = RemoteHost(inst.public_dns_name, keyfile_path)
+        host.ami = ami
+        hosts.append(host)
+
+    # Start docker containers if requested
+    if use_docker:
+        for host in hosts:
+            update_apt_repo(host)
+            host.start_docker()
+
+    # Set up /etc/hosts and env vars for multi-node clusters
+    if len(instances) > 1:
+        configure_cluster_hosts(hosts, instances)
+
+    # Provision all nodes in parallel (docker, sccache, configs, CUDA, etc.)
+    async def provision_all_nodes():
+        loop = asyncio.get_event_loop()
+        with ThreadPoolExecutor(max_workers=len(hosts)) as pool:
+            await asyncio.gather(*(
+                loop.run_in_executor(
+                    pool,
+                    functools.partial(
+                        provision_node,
+                        i,
+                        hosts[i],
+                        instances[i],
+                        instances,
+                        use_docker=use_docker,
+                        sccache_image=sccache_image,
+                        python_version=python_version,
+                    ),
+                )
+                for i in range(len(hosts))
+            ))
+
+    print(f"Provisioning {len(hosts)} node(s) in parallel")
+    asyncio.run(provision_all_nodes())
+
+    # Print cluster summary
+    if len(instances) > 1:
+        print(f"\n--- Cluster Summary ({len(instances)} instances) ---")
+        for i, inst in enumerate(instances):
+            print(
+                f"  node-{i}: {inst.public_dns_name}"
+                f" (private: {inst.private_ip_address})"
+            )
+
+    return hosts, instances
+
+
 def get_instance_name(instance) -> Optional[str]:
     if instance.tags is None:
         return None
@@ -638,75 +725,21 @@ if __name__ == "__main__":
             Cannot find keyfile with name: [{key_name}] in path: [{keyfile_path}], please
             check `~/.ssh/` folder or manually set SSH_KEY_PATH environment variable.""")
 
-    # Starting the instance(s)
-    instances = start_instances(
-        key_name,
-        count=args.num_instances,
-        ami=ami,
-        instance_type=args.instance_type,
-        ebs_size=args.ebs_size,
-    )
     instance_name = f"{args.key_name}-{args.os}"
     if args.python_version is not None:
         instance_name += f"-py{args.python_version}"
-    for i, inst in enumerate(instances):
-        node_suffix = f"-node{i}" if len(instances) > 1 else ""
-        inst.create_tags(
-            DryRun=False,
-            Tags=[
-                {
-                    "Key": "Name",
-                    "Value": f"{instance_name}{node_suffix}",
-                }
-            ],
-        )
 
-    hosts = []
-    for inst in instances:
-        wait_for_connection(inst.public_dns_name, 22)
-        host = RemoteHost(inst.public_dns_name, keyfile_path)
-        host.ami = ami
-        hosts.append(host)
-
-    if args.use_docker:
-        for host in hosts:
-            update_apt_repo(host)
-            host.start_docker()
-
-    if len(instances) > 1:
-        configure_cluster_hosts(hosts, instances)
-
-    sccache_image = "ghcr.io/malfet/deleteme/sccache-arm:latest"
-
-    async def provision_all_nodes():
-        loop = asyncio.get_event_loop()
-        with ThreadPoolExecutor(max_workers=len(hosts)) as pool:
-            await asyncio.gather(*(
-                loop.run_in_executor(
-                    pool,
-                    functools.partial(
-                        provision_node,
-                        i,
-                        hosts[i],
-                        instances[i],
-                        instances,
-                        use_docker=args.use_docker,
-                        sccache_image=sccache_image,
-                        python_version=args.python_version,
-                    ),
-                )
-                for i in range(len(hosts))
-            ))
-
-    print(f"Provisioning {len(hosts)} node(s) in parallel")
-    asyncio.run(provision_all_nodes())
-    if len(instances) > 1:
-        print(f"\n--- Cluster Summary ({len(instances)} instances) ---")
-        for i, inst in enumerate(instances):
-            print(
-                f"  node-{i}: {inst.public_dns_name}"
-                f" (private: {inst.private_ip_address})"
-            )
+    hosts, instances = setup_nodes(
+        key_name=key_name,
+        keyfile_path=keyfile_path,
+        instance_name=instance_name,
+        num_instances=args.num_instances,
+        ami=ami,
+        instance_type=args.instance_type,
+        ebs_size=args.ebs_size,
+        use_docker=args.use_docker,
+        python_version=args.python_version,
+    )
 
     if args.alloc_instance:
         sys.exit(0)
