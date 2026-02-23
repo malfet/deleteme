@@ -477,8 +477,22 @@ def provision_node(
             )
             print(f"{prefix} Created .config/sccache/config")
             host.run_ssh_cmd(
-                "sudo apt-get install -y vim git python3-venv python3-dev g++"
+                "sudo apt-get install -y vim git make python3-venv python3-dev g++ wget"
             )
+            # Install CUDA toolkit (no cuDNN)
+            print(f"{prefix} Installing CUDA toolkit 12.8.1")
+            cuda_runfile = "cuda_12.8.1_570.124.06_linux_sbsa.run"
+            host.run_ssh_cmd(
+                f"wget -q https://developer.download.nvidia.com/compute/cuda/12.8.1/local_installers/{cuda_runfile}"
+            )
+            host.run_ssh_cmd(f"chmod +x {cuda_runfile}")
+            host.run_ssh_cmd(f"sudo ./{cuda_runfile} --toolkit --silent")
+            host.run_ssh_cmd(f"rm -f {cuda_runfile}")
+            host.run_ssh_cmd(
+                "sudo rm -f /usr/local/cuda && sudo ln -s /usr/local/cuda-12.8 /usr/local/cuda"
+            )
+            host.run_ssh_cmd("sudo ldconfig")
+            print(f"{prefix} CUDA toolkit installed")
             host.run_ssh_cmd(
                 "nohup sccache-dist scheduler --config ~/scheduler.conf"
                 " > ~/scheduler.log 2>&1 &"
@@ -710,8 +724,9 @@ if __name__ == "__main__":
     max_jobs = int(nproc) * len(instances)
     print(f"Starting PyTorch build with MAX_JOBS={max_jobs}")
     host.run_ssh_cmd(
-        f"bash -c 'cd ~/pytorch && source ~/py3.12-build/bin/activate"
-        f" && MAX_JOBS={max_jobs} python setup.py bdist_wheel'"
+        f"bash -c 'export PATH=/usr/local/cuda/bin:$PATH"
+        f" && cd ~/pytorch && source ~/py3.12-build/bin/activate"
+        f" && TORCH_CUDA_ARCH_LIST=9.0 MAX_JOBS={max_jobs} python setup.py bdist_wheel'"
     )
 
     # Parse .ninja_log to report build time
