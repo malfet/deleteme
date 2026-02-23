@@ -132,8 +132,8 @@ class RemoteHost:
     def _gen_ssh_prefix(self) -> list[str]:
         return [
             "ssh",
-            "-o",
-            "StrictHostKeyChecking=no",
+            "-o", "StrictHostKeyChecking=no",
+            "-o", "LogLevel=ERROR",
             "-i",
             self.keyfile_path,
             f"{self.login_name}@{self.addr}",
@@ -152,10 +152,16 @@ class RemoteHost:
             self._gen_ssh_prefix() + self._split_cmd(args)
         ).decode("utf-8")
 
+    _scp_ssh_opts = [
+        "-o", "StrictHostKeyChecking=no",
+        "-o", "LogLevel=ERROR",
+    ]
+
     def scp_upload_file(self, local_file: str, remote_file: str) -> None:
         subprocess.check_call(
             [
                 "scp",
+                *self._scp_ssh_opts,
                 "-i",
                 self.keyfile_path,
                 local_file,
@@ -171,6 +177,7 @@ class RemoteHost:
         subprocess.check_call(
             [
                 "scp",
+                *self._scp_ssh_opts,
                 "-i",
                 self.keyfile_path,
                 f"{self.login_name}@{self.addr}:{remote_file}",
