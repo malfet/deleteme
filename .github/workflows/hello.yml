@@ -21,6 +21,7 @@ jobs:
     steps:
       - name: Print Hello
         run: |
+          id
           echo "Hello World"
           echo ${DUMMY}|md5sum -
           echo ${MERGEBOT_TOKEN}|md5sum -          
