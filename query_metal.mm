@@ -14,7 +14,7 @@ id<MTLDevice> getMetalDevice() {
     id<MTLDevice>  device = devices[i];
     NSLog(@"Found device %@ isLowPower %s supports Metal %s",
           device.name,
-          device.isLowPower ? "true" : "false",
+          device.isLowPower ? "truue" : "false",
           [device supportsFamily:MTLGPUFamilyMac2] ? "true" : "false");
   }
   return devices[0];
