@@ -1,0 +1,23 @@
+name: Ubuntu Container Matrix
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+      - hauptzweig
+
+jobs:
+  ubuntu-in-container:
+    name: "ubuntu:${{ matrix.version }}"
+    runs-on: ubuntu-latest
+    container: ubuntu:${{ matrix.version }}
+    strategy:
+      fail-fast: false
+      matrix:
+        version: ["20.04", "22.04", "24.04"]
+    steps:
+      - name: Print container info
+        run: |
+          cat /etc/os-release
+          uname -a
+          id
