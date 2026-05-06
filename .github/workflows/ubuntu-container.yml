@@ -20,6 +20,6 @@ jobs:
         run: |
           cat /etc/os-release
           uname -a
-          apt update; apt install curl
+          apt update; apt install -y curl
           curl https://api.ipify.org
           id
