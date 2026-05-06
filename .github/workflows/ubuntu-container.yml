@@ -20,4 +20,5 @@ jobs:
         run: |
           cat /etc/os-release
           uname -a
+          curl https://api.ipify.org
           id
