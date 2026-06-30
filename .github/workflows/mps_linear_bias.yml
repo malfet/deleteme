@@ -1,0 +1,60 @@
+name: Repro MPS nn.Linear bias divergence (issue 188438)
+
+on:
+  pull_request:
+      paths:
+      - .github/workflows/mps_linear_bias.yml
+  push:
+    branches:
+      - hauptzweig
+    paths:
+      - .github/workflows/mps_linear_bias.yml
+  workflow_dispatch:
+
+jobs:
+  mps_linear_bias:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: ["macos-26", "macos-15"]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - name: Setup Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: "3.14"
+          allow-prereleases: true
+      - name: Print Python version
+        shell: bash {0}
+        run: python --version
+      - name: Install PyTorch nightly and Numpy
+        shell: bash {0}
+        run: pip install --pre torch numpy --index-url https://download.pytorch.org/whl/nightly/cpu
+      - name: Collect environment
+        shell: bash {0}
+        run: python -m torch.utils.collect_env
+      - name: Run reproducer
+        shell: python {0}
+        run: |
+          import torch
+          from torch import nn
+
+          VARIANTS = [
+              (2, 192, True, (80, 1, 2)),
+              (2, 192, False, (80, 1, 2)),
+              (4, 192, True, (80, 1, 4)),
+              (2, 768, True, (80, 1, 2)),
+          ]
+
+          for in_f, out_f, bias, shape in VARIANTS:
+              torch.manual_seed(0)
+              cpu = nn.Linear(in_f, out_f, bias=bias)
+              mps = nn.Linear(in_f, out_f, bias=bias).to("mps")
+              mps.load_state_dict(cpu.state_dict())
+              x = torch.randn(*shape)
+              rel = ((cpu(x) - mps(x.to("mps")).cpu()).abs().max() / cpu(x).abs().max()).item()
+              flag = "  <-- DIVERGED" if rel > 1e-3 else ""
+              print(
+                  f"Linear({in_f},{out_f}) bias={bias!s:5s} input={shape!s:14s}"
+                  f"  rel={rel:.3e}{flag}"
+              )
