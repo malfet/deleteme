@@ -17,7 +17,10 @@ jobs:
       fail-fast: false
       matrix:
         os: ["macos-26", "macos-15"]
+        prefer_metal: ["0", "1"]
     runs-on: ${{ matrix.os }}
+    env:
+      PYTORCH_MPS_PREFER_METAL: ${{ matrix.prefer_metal }}
     steps:
       - name: Setup Python
         uses: actions/setup-python@v6
@@ -36,8 +39,12 @@ jobs:
       - name: Run reproducer
         shell: python {0}
         run: |
+          import os
+          import sys
           import torch
           from torch import nn
+
+          print(f"PYTORCH_MPS_PREFER_METAL={os.environ.get('PYTORCH_MPS_PREFER_METAL')!r}")
 
           VARIANTS = [
               (2, 192, True, (80, 1, 2)),
@@ -46,15 +53,46 @@ jobs:
               (2, 768, True, (80, 1, 2)),
           ]
 
+          def rel_err(ref, got):
+              return (((ref - got).abs().max()) / ref.abs().max()).item()
+
+          def linear_manual(x, w, b):
+              out = x @ w.t()
+              if b is not None:
+                  out = out + b
+              return out
+
+          diverged = False
+
           for in_f, out_f, bias, shape in VARIANTS:
               torch.manual_seed(0)
               cpu = nn.Linear(in_f, out_f, bias=bias)
               mps = nn.Linear(in_f, out_f, bias=bias).to("mps")
               mps.load_state_dict(cpu.state_dict())
               x = torch.randn(*shape)
-              rel = ((cpu(x) - mps(x.to("mps")).cpu()).abs().max() / cpu(x).abs().max()).item()
+
+              # nn.Linear op
+              rel = rel_err(cpu(x), mps(x.to("mps")).cpu())
               flag = "  <-- DIVERGED" if rel > 1e-3 else ""
+              diverged |= len(flag) > 0
               print(
                   f"Linear({in_f},{out_f}) bias={bias!s:5s} input={shape!s:14s}"
                   f"  rel={rel:.3e}{flag}"
               )
+
+              # Manual matmul + bias using the same weight/bias
+              w, b = cpu.weight, cpu.bias
+              ref = linear_manual(x, w, b)
+              got = linear_manual(
+                  x.to("mps"), w.to("mps"), b.to("mps") if b is not None else None
+              ).cpu()
+              rel = rel_err(ref, got)
+              flag = "  <-- DIVERGED" if rel > 1e-3 else ""
+              diverged |= len(flag) > 0
+              print(
+                  f"matmul({in_f},{out_f}) bias={bias!s:5s} input={shape!s:14s}"
+                  f"  rel={rel:.3e}{flag}"
+              )
+
+          if diverged:
+              sys.exit(1)
