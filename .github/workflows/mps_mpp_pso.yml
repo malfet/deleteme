@@ -129,20 +129,19 @@ jobs:
           print("sdpa out:", out.shape)
           print("sdpa OK")
 
-  # Does PYTORCH_MPS_METAL_VERSION=3.1 actually avoid the failure? Uses the
-  # macOS wheel PyTorch CI built for pytorch/pytorch#196881, which is the first
-  # build that has the override. Both arms set the variable explicitly, so the
-  # only difference between them is its value.
+  # Before/after on the real thing: the same probes against the wheel PyTorch CI
+  # built for pytorch/pytorch#196881 before the Apple7 family check (aa8bbe5) and
+  # after it (9366276). No env var is set, so this tests whether the fix works on
+  # its own -- the env override is exercised separately below.
   mps_mpp_fix:
     strategy:
       fail-fast: false
       matrix:
         os: ["macos-26", "macos-15"]
-        metal_version: ["4.0", "3.1"]
+        build: ["before", "after"]
     runs-on: ${{ matrix.os }}
-    env:
-      PYTORCH_MPS_METAL_VERSION: ${{ matrix.metal_version }}
     steps:
+      - uses: actions/checkout@v4
       - name: Setup Python
         uses: actions/setup-python@v6
         with:
@@ -151,9 +150,13 @@ jobs:
         shell: bash {0}
         run: |
           set -ex
+          if [ "${{ matrix.build }}" = "before" ]; then
+            TAG=mps-mpp-fix-aa8bbe5; WHL=torch-2.15.0a0+gitaa8bbe5-cp312-cp312-macosx_14_0_arm64.whl
+          else
+            TAG=mps-mpp-fix-9366276; WHL=torch-2.15.0a0+git9366276-cp312-cp312-macosx_14_0_arm64.whl
+          fi
           # pip parses the wheel metadata out of the filename, so keep it intact
-          WHL="torch-2.15.0a0+gitaa8bbe5-cp312-cp312-macosx_14_0_arm64.whl"
-          curl -fsSL -o "${WHL}" "https://github.com/malfet/deleteme/releases/download/mps-mpp-fix-aa8bbe5/torch-2.15.0a0%2Bgitaa8bbe5-cp312-cp312-macosx_14_0_arm64.whl"
+          curl -fsSL -o "${WHL}" "https://github.com/malfet/deleteme/releases/download/${TAG}/${WHL//+/%2B}"
           pip install "./${WHL}" numpy
       - name: Host info
         shell: bash {0}
@@ -161,54 +164,39 @@ jobs:
           sw_vers
           sysctl -n machdep.cpu.brand_string
       - name: Run probes
-        shell: python {0}
+        shell: bash {0}
+        # Only the unfixed build on virtualized macOS 26 should fail
+        env:
+          EXPECT: ${{ (matrix.os == 'macos-26' && matrix.build == 'before') && 'fail' || 'pass' }}
+        run: python probe_mpp.py
+
+  # The env override still has to work on top of the family check
+  mps_mpp_override:
+    strategy:
+      fail-fast: false
+      matrix:
+        metal_version: ["3.1", "4.0"]
+    runs-on: macos-26
+    steps:
+      - uses: actions/checkout@v4
+      - name: Setup Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+      - name: Install fixed PyTorch wheel
+        shell: bash {0}
         run: |
-          import os
-          import sys
-          import traceback
-          import torch
-
-          def cholesky_ex():
-              assert torch.linalg.cholesky_ex(torch.eye(6, device="mps")).info.item() == 0
-
-          def multivariate_normal():
-              torch.distributions.MultivariateNormal(
-                  torch.zeros(6, device="mps"), torch.eye(6, device="mps")
-              ).sample()
-
-          def linalg_solve():
-              a = torch.rand(128, 128, device="mps") + 128 * torch.eye(128, device="mps")
-              b = torch.rand(128, 1, device="mps")
-              torch.linalg.solve(a, b)
-
-          def conv3d():
-              x = torch.rand(1, 8, 16, 16, 16, device="mps")
-              w = torch.rand(8, 8, 3, 3, 3, device="mps")
-              torch.nn.functional.conv3d(x, w, padding=1)
-
-          def sdpa():
-              q = torch.rand(1, 4, 128, 64, device="mps")
-              torch.nn.functional.scaled_dot_product_attention(q, q, q)
-
-          requested = os.environ["PYTORCH_MPS_METAL_VERSION"]
-          print(f"PYTORCH_MPS_METAL_VERSION={requested} torch={torch.__version__}\n")
-
-          failed = []
-          for probe in (cholesky_ex, multivariate_normal, linalg_solve, conv3d, sdpa):
-              try:
-                  probe()
-                  print(f"{probe.__name__:<22} ok")
-              except Exception:
-                  failed.append(probe.__name__)
-                  print(f"{probe.__name__:<22} FAIL")
-                  traceback.print_exc()
-
-          # 3.1 disables MPP, so every probe must pass; 4.0 is the status quo and
-          # is expected to fail on virtualized macOS 26, so it only reports.
-          if requested == "3.1" and failed:
-              print(f"\n{requested} did not avoid the failure: {failed}")
-              sys.exit(1)
-          print(f"\nfailed under {requested}: {failed or 'none'}")
+          set -ex
+          WHL=torch-2.15.0a0+git9366276-cp312-cp312-macosx_14_0_arm64.whl
+          curl -fsSL -o "${WHL}" "https://github.com/malfet/deleteme/releases/download/mps-mpp-fix-9366276/${WHL//+/%2B}"
+          pip install "./${WHL}" numpy
+      - name: Run probes
+        shell: bash {0}
+        # The family check is ANDed in, so forcing 4.0 must not re-enable MPP
+        env:
+          EXPECT: pass
+          PYTORCH_MPS_METAL_VERSION: ${{ matrix.metal_version }}
+        run: python probe_mpp.py
 
   # Which runtime signals, if any, distinguish the virtualized GPU that cannot
   # build MPP pipelines from a real one?
