@@ -128,3 +128,82 @@ jobs:
           out = torch.nn.functional.scaled_dot_product_attention(q, q, q)
           print("sdpa out:", out.shape)
           print("sdpa OK")
+
+  # Does PYTORCH_MPS_METAL_VERSION=3.1 actually avoid the failure? Uses the
+  # macOS wheel PyTorch CI built for pytorch/pytorch#196881, which is the first
+  # build that has the override. Both arms set the variable explicitly, so the
+  # only difference between them is its value.
+  mps_mpp_fix:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: ["macos-26", "macos-15"]
+        metal_version: ["4.0", "3.1"]
+    runs-on: ${{ matrix.os }}
+    env:
+      PYTORCH_MPS_METAL_VERSION: ${{ matrix.metal_version }}
+    steps:
+      - name: Setup Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+      - name: Install PyTorch wheel from pytorch/pytorch#196881
+        shell: bash {0}
+        run: |
+          set -ex
+          curl -fsSL -o torch.whl "https://github.com/malfet/deleteme/releases/download/mps-mpp-fix-aa8bbe5/torch-2.15.0a0%2Bgitaa8bbe5-cp312-cp312-macosx_14_0_arm64.whl"
+          pip install ./torch.whl numpy
+      - name: Host info
+        shell: bash {0}
+        run: |
+          sw_vers
+          sysctl -n machdep.cpu.brand_string
+      - name: Run probes
+        shell: python {0}
+        run: |
+          import os
+          import sys
+          import traceback
+          import torch
+
+          def cholesky_ex():
+              assert torch.linalg.cholesky_ex(torch.eye(6, device="mps")).info.item() == 0
+
+          def multivariate_normal():
+              torch.distributions.MultivariateNormal(
+                  torch.zeros(6, device="mps"), torch.eye(6, device="mps")
+              ).sample()
+
+          def linalg_solve():
+              a = torch.rand(128, 128, device="mps") + 128 * torch.eye(128, device="mps")
+              b = torch.rand(128, 1, device="mps")
+              torch.linalg.solve(a, b)
+
+          def conv3d():
+              x = torch.rand(1, 8, 16, 16, 16, device="mps")
+              w = torch.rand(8, 8, 3, 3, 3, device="mps")
+              torch.nn.functional.conv3d(x, w, padding=1)
+
+          def sdpa():
+              q = torch.rand(1, 4, 128, 64, device="mps")
+              torch.nn.functional.scaled_dot_product_attention(q, q, q)
+
+          requested = os.environ["PYTORCH_MPS_METAL_VERSION"]
+          print(f"PYTORCH_MPS_METAL_VERSION={requested} torch={torch.__version__}\n")
+
+          failed = []
+          for probe in (cholesky_ex, multivariate_normal, linalg_solve, conv3d, sdpa):
+              try:
+                  probe()
+                  print(f"{probe.__name__:<22} ok")
+              except Exception:
+                  failed.append(probe.__name__)
+                  print(f"{probe.__name__:<22} FAIL")
+                  traceback.print_exc()
+
+          # 3.1 disables MPP, so every probe must pass; 4.0 is the status quo and
+          # is expected to fail on virtualized macOS 26, so it only reports.
+          if requested == "3.1" and failed:
+              print(f"\n{requested} did not avoid the failure: {failed}")
+              sys.exit(1)
+          print(f"\nfailed under {requested}: {failed or 'none'}")
