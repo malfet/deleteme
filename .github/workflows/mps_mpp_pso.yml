@@ -1,0 +1,130 @@
+name: Repro MPS MetalPerformancePrimitives PSO failure (issue 196582)
+
+on:
+  pull_request:
+      paths:
+      - .github/workflows/mps_mpp_pso.yml
+  push:
+    branches:
+      - hauptzweig
+    paths:
+      - .github/workflows/mps_mpp_pso.yml
+  workflow_dispatch:
+
+jobs:
+  mps_mpp_pso:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: ["macos-26", "macos-15"]
+        wheel:
+          # The version from the bug report
+          - https://download-r2.pytorch.org/whl/cpu/torch-2.14.0-cp313-cp313-macosx_14_0_arm64.whl
+          # Current main, to check it still reproduces
+          - https://download-r2.pytorch.org/whl/nightly/cpu/torch-2.15.0.dev20260912-cp313-cp313-macosx_14_0_arm64.whl
+    runs-on: ${{ matrix.os }}
+    steps:
+      - name: Setup Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: "3.13"
+      - name: Install PyTorch wheel
+        shell: bash {0}
+        run: |
+          set -ex
+          curl -fsSLO "${{ matrix.wheel }}"
+          pip install ./torch-*.whl numpy
+
+      - name: Smoke test
+        shell: python {0}
+        run: |
+          import torch
+          print(torch.rand(3, 3, device="mps"))
+
+      - name: Host and GPU info
+        shell: bash {0}
+        run: |
+          sw_vers
+          sysctl -n machdep.cpu.brand_string
+          system_profiler SPDisplaysDataType | head -20
+          python -c "import torch; print('MPS available:', torch.backends.mps.is_available())"
+
+      - name: Collect environment
+        shell: bash {0}
+        run: python -m torch.utils.collect_env
+
+      # Each probe below exercises a path that dispatches on has_mpp(), i.e. one
+      # that runs MetalPerformancePrimitives cooperative-tensor kernels on macOS
+      # 26.2+ and plain Metal 3 kernels otherwise. They are continue-on-error so
+      # that one failure does not hide the others.
+
+      - name: Probe cholesky_ex
+        continue-on-error: true
+        shell: python {0}
+        run: |
+          import torch
+          m = torch.eye(6, device="mps")
+          print("info =", torch.linalg.cholesky_ex(m).info.item())
+          print("cholesky_ex OK")
+
+      - name: Probe MultivariateNormal (the reported symptom)
+        continue-on-error: true
+        shell: python {0}
+        run: |
+          import torch
+          d = torch.distributions.MultivariateNormal(
+              torch.zeros(6, device="mps"), torch.eye(6, device="mps")
+          )
+          print("sample:", d.sample())
+          print("MultivariateNormal OK")
+
+      - name: Probe matmul
+        continue-on-error: true
+        shell: python {0}
+        run: |
+          import torch
+          a = torch.rand(512, 512, device="mps")
+          rel = ((a @ a).cpu() - a.cpu() @ a.cpu()).abs().max().item()
+          print("matmul max abs err:", rel)
+          print("matmul OK")
+
+      - name: Probe linalg_solve / lu
+        continue-on-error: true
+        shell: python {0}
+        run: |
+          import torch
+          a = torch.rand(128, 128, device="mps") + 128 * torch.eye(128, device="mps")
+          b = torch.rand(128, 1, device="mps")
+          x = torch.linalg.solve(a, b)
+          print("solve residual:", (a @ x - b).abs().max().item())
+          print("linalg.solve OK")
+
+      - name: Probe conv3d
+        continue-on-error: true
+        shell: python {0}
+        run: |
+          import torch
+          x = torch.rand(1, 8, 16, 16, 16, device="mps")
+          w = torch.rand(8, 8, 3, 3, 3, device="mps")
+          print("conv3d out:", torch.nn.functional.conv3d(x, w, padding=1).shape)
+          print("conv3d OK")
+
+      - name: Probe grouped mm
+        continue-on-error: true
+        shell: python {0}
+        run: |
+          import torch
+          a = torch.rand(4, 64, 64, device="mps")
+          b = torch.rand(4, 64, 64, device="mps")
+          print("bmm out:", torch.bmm(a, b).shape)
+          print("grouped mm OK")
+
+      - name: Probe scaled_dot_product_attention
+        continue-on-error: true
+        shell: python {0}
+        run: |
+          import torch
+          q = torch.rand(1, 4, 128, 64, device="mps")
+          out = torch.nn.functional.scaled_dot_product_attention(q, q, q)
+          print("sdpa out:", out.shape)
+          print("sdpa OK")
