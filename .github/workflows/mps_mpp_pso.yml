@@ -151,8 +151,10 @@ jobs:
         shell: bash {0}
         run: |
           set -ex
-          curl -fsSL -o torch.whl "https://github.com/malfet/deleteme/releases/download/mps-mpp-fix-aa8bbe5/torch-2.15.0a0%2Bgitaa8bbe5-cp312-cp312-macosx_14_0_arm64.whl"
-          pip install ./torch.whl numpy
+          # pip parses the wheel metadata out of the filename, so keep it intact
+          WHL="torch-2.15.0a0+gitaa8bbe5-cp312-cp312-macosx_14_0_arm64.whl"
+          curl -fsSL -o "${WHL}" "https://github.com/malfet/deleteme/releases/download/mps-mpp-fix-aa8bbe5/torch-2.15.0a0%2Bgitaa8bbe5-cp312-cp312-macosx_14_0_arm64.whl"
+          pip install "./${WHL}" numpy
       - name: Host info
         shell: bash {0}
         run: |
