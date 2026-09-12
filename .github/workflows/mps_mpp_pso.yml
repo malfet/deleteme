@@ -209,3 +209,20 @@ jobs:
               print(f"\n{requested} did not avoid the failure: {failed}")
               sys.exit(1)
           print(f"\nfailed under {requested}: {failed or 'none'}")
+
+  # Which runtime signals, if any, distinguish the virtualized GPU that cannot
+  # build MPP pipelines from a real one?
+  vm_signals:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: ["macos-26", "macos-15"]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build and run probe
+        shell: bash {0}
+        run: |
+          set -ex
+          clang++ -std=c++17 -fobjc-arc -framework Metal -framework Foundation -o vm_signals vm_signals.mm
+          ./vm_signals
