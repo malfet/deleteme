@@ -35,12 +35,32 @@ jobs:
         run:  env
       - name: Install PyTorch and Numpy
         shell: bash {0}
-        run:  pip install torch numpy
+        run:  pip install torch==2.14.1 numpy
       - name: Run Python script
         shell: python {0}
         run: |
-          import sys
           import torch
-          print(f"Python version is {sys.version} torch version is {torch.__version__}")
-          x = torch.rand(3, 3, dtype=torch.float16)
-          print(x.sum())
+
+          print(f"torch version is {torch.__version__}")
+          lib = torch.mps.compile_shader("""
+          using namespace metal;
+
+          kernel void nan_swap(device atomic<float>* data [[buffer(0)]],
+                               device uint* loops [[buffer(1)]],
+                               uint tid [[thread_position_in_grid]]) {
+            data += tid & 3;
+            float desired = (tid & 1) ? float(tid) : NAN;
+            float expected = atomic_load_explicit(data, memory_order_relaxed);
+            uint n = 0;
+            while (n++ < 1000 && !atomic_compare_exchange_weak_explicit(
+                       data, &expected, desired, memory_order_relaxed, memory_order_relaxed)) {
+            }
+            loops[tid] = n;
+          }
+          """)
+
+          N = 1024
+          data = torch.arange(4.0, device="mps")
+          loops = torch.zeros(N, dtype=torch.int32, device="mps")
+          lib.nan_swap(data, loops, threads=N)
+          print("max loops:", loops.max().item(), "final values:", data)
