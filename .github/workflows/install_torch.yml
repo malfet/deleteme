@@ -45,15 +45,15 @@ jobs:
           lib = torch.mps.compile_shader("""
           using namespace metal;
 
-          kernel void nan_swap(device atomic<float>* data [[buffer(0)]],
+          kernel void nan_swap(device atomic_int* data [[buffer(0)]],
                                device uint* loops [[buffer(1)]],
                                uint tid [[thread_position_in_grid]]) {
             data += tid & 3;
             float desired = (tid & 1) ? float(tid) : NAN;
-            float expected = atomic_load_explicit(data, memory_order_relaxed);
+            int expected = atomic_load_explicit(data, memory_order_relaxed);
             uint n = 0;
             while (n++ < 1000 && !atomic_compare_exchange_weak_explicit(
-                       data, &expected, desired, memory_order_relaxed, memory_order_relaxed)) {
+                       data, &expected, as_type<int>(desired), memory_order_relaxed, memory_order_relaxed)) {
             }
             loops[tid] = n;
           }
