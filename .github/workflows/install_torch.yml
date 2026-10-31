@@ -35,7 +35,7 @@ jobs:
         run:  env
       - name: Install PyTorch and Numpy
         shell: bash {0}
-        run:  pip install torch==2.14.1 numpy
+        run:  pip install torch==2.15.0 numpy
       - name: Run Python script
         shell: python {0}
         run: |
