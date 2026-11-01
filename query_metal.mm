@@ -95,6 +95,7 @@ kernel void metal32_test(device float* out [[buffer(0)]],
 )MTL";
 
 static void runMetal32Test(id<MTLDevice> dev) {
+#if __MAC_OS_X_VERSION_MAX_ALLOWED >= 150000
   if (@available(macOS 15.0, *)) {
     NSError *err = nil;
     MTLCompileOptions *opts = [[MTLCompileOptions new] autorelease];
@@ -116,17 +117,20 @@ static void runMetal32Test(id<MTLDevice> dev) {
     MTLLogStateDescriptor *logDesc = [[MTLLogStateDescriptor new] autorelease];
     logDesc.level = MTLLogLevelDebug;
     id<MTLLogState> logState = [dev newLogStateWithDescriptor:logDesc error:&err];
+    id<MTLCommandQueue> queue = nil;
     if (logState == nil) {
-      NSLog(@"Failed to create log state: %@", err.localizedDescription);
-      return;
+      NSLog(@"Failed to create log state (shader logs unavailable): %@",
+            err.localizedDescription);
+      queue = [dev newCommandQueue];
+    } else {
+      [logState addLogHandler:^(NSString *subsystem, NSString *category,
+                                MTLLogLevel level, NSString *message) {
+        NSLog(@"Shader log [%@/%@]: %@", subsystem, category, message);
+      }];
+      MTLCommandQueueDescriptor *qDesc = [[MTLCommandQueueDescriptor new] autorelease];
+      qDesc.logState = logState;
+      queue = [dev newCommandQueueWithDescriptor:qDesc];
     }
-    [logState addLogHandler:^(NSString *subsystem, NSString *category,
-                              MTLLogLevel level, NSString *message) {
-      NSLog(@"Shader log [%@/%@]: %@", subsystem, category, message);
-    }];
-    MTLCommandQueueDescriptor *qDesc = [[MTLCommandQueueDescriptor new] autorelease];
-    qDesc.logState = logState;
-    id<MTLCommandQueue> queue = [dev newCommandQueueWithDescriptor:qDesc];
 
     constexpr unsigned N = 4;
     auto buf = allocSharedBuffer(dev, N * sizeof(float));
@@ -152,6 +156,9 @@ static void runMetal32Test(id<MTLDevice> dev) {
   } else {
     NSLog(@"Metal 3.2 requires macOS 15+, skipping");
   }
+#else
+  NSLog(@"Metal 3.2 requires macOS 15+ SDK, skipping");
+#endif
 }
 
 int main() {
