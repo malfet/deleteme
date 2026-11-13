@@ -1,0 +1,46 @@
+name: Repro MPS on macOS 14 (issue 204594)
+
+on:
+  pull_request:
+      paths:
+      - .github/workflows/mps_macos14.yml
+  push:
+    branches:
+      - hauptzweig
+    paths:
+      - .github/workflows/mps_macos14.yml
+  workflow_dispatch:
+
+jobs:
+  mps_macos14:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: ["macos-14"]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - name: Setup Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+      - name: Print OS version
+        shell: bash {0}
+        run: sw_vers
+      - name: Install PyTorch
+        shell: bash {0}
+        run: pip install torch==2.15.0 numpy
+      - name: Collect environment
+        shell: bash {0}
+        run: python -m torch.utils.collect_env
+      - name: Run reproducer
+        shell: python {0}
+        run: |
+          import torch
+          print(torch.__version__)
+          print("mps available:", torch.backends.mps.is_available())
+          print("mps built:", torch.backends.mps.is_built())
+          x = torch.ones(2, device="mps")
+          print("allocation:", x)
+          a = torch.randn(8, 5, device="mps")
+          w = torch.randn(3, 5, device="mps")
+          print(torch.nn.functional.linear(a, w))
